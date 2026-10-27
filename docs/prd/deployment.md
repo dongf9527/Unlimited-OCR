@@ -11,6 +11,13 @@
 | Python | 3.10（两条路线各自的独立 venv） | 3.10 |
 | 网络 | 首次需下载权重，之后可离线 | 同左 |
 
+环境自检（目标 venv 内运行，逐项核对版本/GPU/磁盘/权重，全绿再进安装与冒烟）：
+
+```bash
+python scripts/check_env.py --route A --model-dir /data/models/Unlimited-OCR-2
+# CI/批量场景用 --json 取机器可读结果；版本适配分析见 env-compat-eval.md
+```
+
 权重下载（一次，离线分发到内网机器）：
 
 ```bash

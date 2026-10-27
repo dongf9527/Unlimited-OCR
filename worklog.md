@@ -191,3 +191,21 @@ Work Log:
 Stage Summary:
 - PRD 与部署文档已上云；LFS filter 本地持久化，git-lfs 丢失时按本记录重装即可
 - 待办提醒：git-lfs 二进制在仓库外，沙箱再清理时需重装（下载 v3.7.0 + git config filter 四条）
+
+---
+Task ID: 11
+Agent: main (Z.ai)
+Task: 沙箱-GitHub 对齐复验 + 用户环境依赖版本适配评估 + scripts/check_env.py 环境自检脚本
+
+Work Log:
+- 对齐复验：token API 验证有效（dongf9527, HTTP 200）；git-lfs 二进制与 filter（global+local）本次均幸存；git fetch 后 HEAD=origin/main=e2f5cdc（0 ahead/0 behind），工作树干净，LFS gif smudge 正常——本批无需推送对齐动作
+- 评估证据链：静态检查 hf-model-code/ 建模源码 import（pytorch_utils.ALL_LAYERNORM_LAYERS、llama.modeling_llama 私有符号、_prepare_4d_causal_attention_mask、is_torch_fx_available）+ WebSearch 佐证 v5 已转正且 issue #43611 证实破坏 remote-code 加载
+- 产出 docs/prd/env-compat-eval.md：逐项对照表 + 三大判定（transformers 5.19.0 路线A硬阻断；torch 2.11.0 路线A可试/路线B禁止；tokenizers 0.23.2 须随 transformers 成组回退）+ 建议（独立 venv，勿动共享环境）
+- 新增 scripts/check_env.py（纯标准库，~530 行）：Python/GPU/驱动/torch 栈/transformers-tokenizers 联动（读 metadata 声明式依赖）/模型侧小库/权重文件(auto_map+safetensors 体积)/磁盘双路线判定；支持 --route A|B|both / --json / --strict / --model-dir / --no-color，退出码 0/1/2
+- 调试记录：--json 模式 stdout 混入横幅与 72 横杠分隔符致 CI 解析失败（报错信息与空输入相同，曾误判为空输出），已修复为纯 JSON 输出；[item] 标签吞字系会话转录渲染问题（od 字节级验证脚本输出完好），脚本不改
+- deployment.md §1 与 docs/README.md 索引同步接入自检脚本与评估文档
+
+Stage Summary:
+- 远程同步于本批提交（check_env 脚本 + 评估文档两个 commit）
+- 用户环境结论速记：pillow/python-docx/opencv 可用；torch 2.11 仅路线A可试；transformers 5.19.0+tokenizers 0.23.2 必须回退 4.52.1+0.21.4（独立 venv 内）
+- 后续管线开发时 CI 可直接复用 check_env.py --json 做环境门禁
