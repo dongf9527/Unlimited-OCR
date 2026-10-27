@@ -65,4 +65,10 @@
 
 `check_env.py --route A` 全绿后单页冒烟一次通过：trust_remote_code 加载 + bf16 推理全链路正常，DASH block-sparse 稀疏注意力（Triton JIT，`_POSIX_C_SOURCE redefined` 为无害编译警告）正常激活，S=1519（image tokens 1513，gundam 单页切片），输出结构化版面块（header / page_number / text + bbox + `<FORK>` 内容）与上游 schema 一致，`save_results` 产物正常落盘。至此 v1.1 定稿矩阵在 Blackwell 消费级卡上完成端到端验证。
 
-同轮发现并修正文档契约 bug：`deployment.md` §3 单页示例原按 `(text, n)` 2 元组解包 `infer()` 返回值，实际 `infer()` 默认返回纯字符串（`return_dict=True` 时返回 `text` / `token_ids` / `prompt` 的 dict），仅 `infer_multi()` 固定返回 2 元组（且其为 `infer(crop_mode=False, return_dict=True)` 的兼容包装；`infer()` 本身即单/多页统一入口）。§3 示例已改为 `return_dict=True` 取值并补注返回值契约。待补实测：单页耗时 / TPS（`infer(..., tps_interval=1)`）与 100 页批量吞吐（16G 卡 `BATCH_PAGES=1` 顺序）。
+同轮发现并修正文档契约 bug：`deployment.md` §3 单页示例原按 `(text, n)` 2 元组解包 `infer()` 返回值，实际 `infer()` 默认返回纯字符串（`return_dict=True` 时返回 `text` / `token_ids` / `prompt` 的 dict），仅 `infer_multi()` 固定返回 2 元组（且其为 `infer(crop_mode=False, return_dict=True)` 的兼容包装；`infer()` 本身即单/多页统一入口）。§3 示例已改为 `return_dict=True` 取值并补注返回值契约。
+
+## 7. TPS 打印刷屏定性与测速修正（2026-10-28，源码核对 `modeling_unlimitedocr.py`）
+
+实测 `infer(..., tps_interval=1)` 的定性结论：`tps_interval` 是真实参数（`infer()` 签名内默认 `0`），语义为"每 N 个 token 打印一行"，`1` 即逐 token 刷屏——该建议作废。打印点在 `_uocr_generate()`（L1185-1187）：`if tps_interval and len(gen) % tps_interval == 0` 时打 `[TPS] tokens=N avg=X t/s`（行首自带 `\n`，故每行间还有一个空行）；`0` 为 falsy，**默认即完全静默**。类 `TPSTextStreamer`（L440，带 `recent=` 字段）在 `infer()` 路径未被使用（L1155 构造的是原生 `TextStreamer`，仅负责流式吐字）。
+
+测速正确姿势（免刷屏、且比 `[TPS]` 行更完整）：`_uocr_generate` 返回 dict 自带计时（L1204-1205），`return_dict=True` 时原样透传——`res['time']`（prefill+decode 总耗时）与 `res['prefill_time']`，decode TPS = `len(res['token_ids']) / (res['time'] - res['prefill_time'])`。需要进度采样时用 `tps_interval=50` 量级。另注：`tokens=1` 首行 avg 为失真值（`t_first` 与首个 token 在同一迭代内赋值，L1177-1178，dt≈0.2ms），从 `tokens=2` 起才有参考意义。若连流式正文吐出都不需要，传 `eval_mode=True`（`stream=False`）全程静默，结束后读 `res['text']`。`deployment.md` §3 已同步补测速注记。待补实测维持：100 页批量吞吐（16G 卡 `BATCH_PAGES=1` 顺序）。

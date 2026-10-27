@@ -89,6 +89,8 @@ PY
 
 > **返回值契约（实测 2026-10-28 修正）**：`infer()` 默认直接返回**纯字符串**，非 dict 模式不存在 `(text, n)` 元组形态——勿按 2 元组解包（会报 `too many values to unpack`）。`infer()` 本身即单/多页统一入口（`image_file` 传 list 即多页；`crop_mode=None` 自动选路：单页 gundam 切片、多页 base）；`infer_multi(image_files=[...])` 是强制 base 模式的兼容包装，固定返回 `(text, n_tokens)` 2 元组。
 
+> **耗时/TPS 实测（勿用 `tps_interval=1`）**：该参数默认 `0`=完全静默，设为 `N` 表示每 N 个 token 打一行 `[TPS]`，`1` 会逐 token 刷屏（实测定性见 `env-compat-eval.md` §7）；确需进度采样用 `tps_interval=50` 量级。测速直接读 `return_dict=True` 返回 dict 自带的计时字段：`res['time']`（总耗时）与 `res['prefill_time']`，decode TPS = `len(res['token_ids']) / (res['time'] - res['prefill_time'])`；连流式正文吐出也不需要时传 `eval_mode=True` 全程静默。
+
 多页（整本一次请求，prompt 由模型侧自动构造为 `"<PAGE><image>"*n + "Multi page parsing."`；`infer_multi` 固定返回 `(text, n_tokens)` 2 元组）：
 
 ```bash
