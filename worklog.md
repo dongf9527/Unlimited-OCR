@@ -209,3 +209,19 @@ Stage Summary:
 - 远程同步于本批提交（check_env 脚本 + 评估文档两个 commit）
 - 用户环境结论速记：pillow/python-docx/opencv 可用；torch 2.11 仅路线A可试；transformers 5.19.0+tokenizers 0.23.2 必须回退 4.52.1+0.21.4（独立 venv 内）
 - 后续管线开发时 CI 可直接复用 check_env.py --json 做环境门禁
+
+---
+Task ID: 12
+Agent: main (Z.ai)
+Task: PRD/部署文档 v1.1 定稿（依赖版本定稿 + Transformers 单路线 conda 化）+ v1.0 归档
+
+Work Log:
+- git mv 归档 v1.0 至 docs/archive/（pdf-ocr-prd-v1.0.md、deployment-v1.0.md，保留历史），新增归档 README（含路线 B 恢复条件）
+- PRD v1.1：§5.1 版本表定稿（torch 2.11.0/torchvision 0.26.0、pillow 11.0.0、opencv 5.0.0.93、python-docx 1.2.0，依据 env-compat-eval.md）；§5.3 路线 B 改归档说明（wheel 绑定 torch 2.13.0 与定稿栈冲突）；量化目标重定（5s/页、600页/时/卡，单请求推理特征）；架构图/4.1 页窗/4.5 python-docx 版本/6 资源上限/7 里程碑/8 风险表联动更新；环境管理定 conda
+- deployment.md v1.1 重写：Transformers 单机路线唯一，conda 全流程（torch cu128 → 推理栈成组安装 → 导出层）、pip freeze + conda env export 锁定复现、单页/多页冒烟、批量客户端骨架（分批 10 页/批 + manifest 断点）、调优速查表（含 transformers 5.x 混入回退项）、验收清单、v1.0 差异对照表
+- check_env.py 基线同步：PIN torch→2.11.0（--route B 自动切归档基线 2.13.0）；pillow/opencv/python-docx 改定稿区间（>=11,<12 等）；sglang 缺失降级 INFO（归档态），summary 路线 B 显示"未部署（已归档）"；删除 note 参数旧逻辑；回归测试 A/B/both+JSON 四模式通过（沙箱 opencv 4.13 正确 WARN、pillow 11.3 PASS）
+- docs/README.md 索引更新 + env-compat-eval.md 增补 §4 结论采纳状态
+
+Stage Summary:
+- 远程同步于本批提交；文档体系现为：PRD v1.1 + deployment v1.1 + eval（定稿依据）+ archive（v1.0 追溯）
+- 定稿版本速记：Python 3.10(conda) / torch 2.11.0 / transformers 4.52.1 / tokenizers 0.21.4 / pillow 11.0.0 / pymupdf 1.27.2.2 / opencv 5.0.0.93 / python-docx 1.2.0

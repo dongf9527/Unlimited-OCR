@@ -50,3 +50,7 @@
 2. **按 deployment.md 建独立 venv，与现有环境并存。** `conda create -n uocr python=3.10`（或 `uv venv --python 3.10`），在 venv 内按文档装 pinned 版本。现有环境中已验证可用的 pillow 11.0.0 / python-docx 1.2.0 / opencv 5.0.0.93 可直接复用同版本号安装。
 3. **若坚持复用 torch 2.11.0 走路线 A**：仅可在不装 SGLang 的纯路线 A venv 中尝试，先跑 deployment.md §2 的单页冒烟，通过后再批量；路线 B 无此选项。
 4. **部署前用自检脚本复核**：`python scripts/check_env.py --route A --model-dir <权重目录>`，全绿（无 FAIL）再进冒烟测试；CI 可用 `--json` 模式收集结果。
+
+## 4. 结论采纳状态（2026-10-28）
+
+本文档 §2/§3 的判定已全部采纳进 PRD v1.1（`pdf-ocr-prd.md` §5.1 定稿版本表）与部署文档 v1.1（`deployment.md`）：torch 2.11.0 成为路线 A 定稿基线（torchvision 0.26.0 配对）；transformers 4.52.1 + tokenizers 0.21.4 维持强制 pin 并在部署文档中标注禁升 5.x；pillow 11.0.0 / opencv-python-headless 5.0.0.93 / python-docx 1.2.0 按实测确认版本定版；SGLang 路线 B 因与定稿 torch 栈冲突移出本期，随 v1.0 文档归档至 `docs/archive/`；环境管理定为 conda 独立环境。`scripts/check_env.py` 已同步按 v1.1 基线校验（--route B 时自动切换归档基线 2.13.0）。
