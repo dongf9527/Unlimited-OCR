@@ -1,2 +1,5 @@
 skills/
 node_modules/
+.env
+research/
+tool-results/
