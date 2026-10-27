@@ -11,7 +11,7 @@ check_env.py — PDF-OCR 管线（Unlimited-OCR-2）环境自检脚本
 用法：
   python scripts/check_env.py                       # 检测当前解释器环境，路线 A+B
   python scripts/check_env.py --route A             # 只按路线 A 判定
-  python scripts/check_env.py --model-dir /data/models/Unlimited-OCR-2
+  python scripts/check_env.py --model-dir ~/sourcecode/Unlimited-OCR/models/Unlimited-OCR
   python scripts/check_env.py --json                # 机器可读输出（CI 用）
   python scripts/check_env.py --strict              # 有 WARN 也返回非零退出码
 
