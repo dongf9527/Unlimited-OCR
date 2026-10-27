@@ -302,3 +302,20 @@ Work Log:
 Stage Summary:
 - v1.1 定稿矩阵在 Blackwell 消费级卡完成端到端验证（自检全绿 + 冒烟通过）
 - 待补实测：单页耗时/TPS（infer(..., tps_interval=1)）与 100 页批量吞吐（16G 卡 BATCH_PAGES=1 顺序）
+
+---
+Task ID: 15
+Agent: main (Z.ai)
+Task: 用户实测 infer(..., tps_interval=1) 逐 token 刷屏——核对 infer() 签名与 tps_interval 语义，给出修正方案并同步文档
+
+Work Log:
+- 源码核对（本地副本 hf-model-code/modeling_unlimitedocr.py，与用户 trust_remote_code 加载同源）：infer() 签名 L1039-1043 确认 tps_interval 为真实参数且默认 0；打印点 _uocr_generate L1185-1187 为 `if tps_interval and len(gen) % tps_interval == 0` → N=1 即逐 token 打 `[TPS]`（行首自带 \n 故多一空行），0=falsy 默认完全静默——刷屏根因为上轮建议的 tps_interval=1
+- 排除干扰项：TPSTextStreamer（L440，recent= 格式）在 infer() 路径未被使用（L1155 构造原生 TextStreamer 仅流式吐字）；tokens=1 首行 avg=4629.5 为失真值（t_first 与首个 token 同迭代赋值 L1177-1178）
+- 发现更优测速路径：_uocr_generate 返回 dict 自带 time/prefill_time（L1204-1205），return_dict=True 时 infer() 原样透传（仅追加 prompt，L1105-1107）→ decode TPS = len(token_ids)/(time-prefill_time)，免刷屏且信息更全
+- 文档同步：env-compat-eval.md 新增 §7（定性 + 测速修正，作废 tps_interval=1 建议）；deployment.md §3 返回值契约后新增"耗时/TPS 实测"注记（勿用 1、采样用 50、静默用 eval_mode=True）
+- 提交 b6f55a2；pre-push hook 因 PATH 缺 git-lfs 拦截，本次纯文本 commit 按 Task 13-b SOP --no-verify 推送成功，本地 = origin/main = b6f55a2；token/git-lfs 本次均幸存
+
+Stage Summary:
+- 结论：tps_interval 默认 0=静默；测速读 res['time']/res['prefill_time']，勿用 tps_interval=1
+- 用户侧修正命令已交付（去 tps_interval 或改 50；全静默 eval_mode=True）
+- 文档修正已上 GitHub（b6f55a2）
