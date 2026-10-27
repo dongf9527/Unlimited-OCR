@@ -75,3 +75,19 @@ Work Log:
 Stage Summary:
 - 新增 docs/github-collaboration-rules.md（规则文档 v1.0）
 - 等待接入信息：第 1 步 GitHub 仓库地址，第 2 步访问 token；收到后配置 remote 并执行首次推送
+
+---
+Task ID: 5
+Agent: main (Z.ai)
+Task: 配置 GitHub 远程并完成首次推送（dongf9527/Unlimited-OCR），建立协作规则生效基线
+
+Work Log:
+- 配置 origin = https://github.com/dongf9527/Unlimited-OCR.git；ls-remote 确认远程为空仓库
+- 推送前安全检查：发现 .env（DATABASE_URL）被 Initial commit 跟踪、research/Unlimited-OCR 为嵌套 gitlink、tool-results/ 为会话临时产物
+- 因远程为空（无已推送历史），在本地执行 filter-branch 清洗三个路径后重写未推送历史（不涉及规则 5/6 保护范畴）；.gitignore 增补 .env、research/、tool-results/ 并以 chore: 提交
+- 使用 token 构造一次性 Authorization Basic 头推送 main 成功（token 未写入 .git/config 或任何文件），建立上游跟踪；ls-remote 验证 origin/main = 本地 HEAD
+- 更新 docs/github-collaboration-rules.md：接入状态表（远程/首推/清洗记录）+ 新增第四节凭证安全约定（token 不落盘、建议轮换、远程 URL 保持干净）
+
+Stage Summary:
+- main → origin/main 首推完成（d2ae0c1），协作规则文档随仓库上 GitHub
+- 后续所有产出按规则 1-4 走 commit + push；token 使用一次性注入方式，无需重复提供（失效时再要新的）

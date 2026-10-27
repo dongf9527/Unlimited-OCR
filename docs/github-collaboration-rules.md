@@ -61,5 +61,13 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | --- | --- |
 | 沙箱仓库路径 | `/home/z/my-project/`（已初始化，分支 `main`） |
 | git 身份 | 已配置（user.name / user.email） |
-| 远程 remote | 待配置——GitHub 仓库地址与访问 token 由使用者分两步提供 |
+| 远程 remote | `https://github.com/dongf9527/Unlimited-OCR.git`（origin，已配置） |
+| 首次推送 | 2026-10-27 完成，`main` → `origin/main`（d2ae0c1），已建立上游跟踪 |
+| 推送前清洗 | `.env`（含 DATABASE_URL）已从全部历史移除并加入 `.gitignore`；`research/`、`tool-results/` 已移出索引并忽略 |
 | `docs/` 目录 | 已创建，本文件为首个沉淀文档（对应规则 4） |
+
+## 四、凭证安全约定
+
+- 访问 token 仅在单次推送中通过一次性 `Authorization` 请求头注入，**不写入** `.git/config`、`credentials` 文件或任何提交内容；
+- token 在对话中出现即视为已暴露，建议使用者定期在 GitHub Settings → Developer settings 中轮换 fine-grained PAT，并保持最小授权（仅目标仓库 Contents: Read/Write）；
+- 远程 URL 始终保持不含凭证的干净形式，避免 token 随仓库配置泄漏。
