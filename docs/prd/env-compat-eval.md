@@ -77,7 +77,9 @@
 
 - 条件：`book01/2.png` 单页 gundam，S=1519（image tokens 1513），`tps_interval` 默认静默，按 §7 方法读返回 dict 计时字段（修正后的 §3 示例命令原样复跑）。
 - 结果：**tokens=211，prefill=6.00s，total=24.37s，decode_TPS=11.5 t/s**（decode ≈18.4s），与首轮逐 token 流式观测（avg 爬升至 ~11.3 t/s）交叉印证一致。
-- 解读：① 冷启动 prefill 含 DASH block-sparse Triton kernel JIT 编译（解码前几步 TPS 仅 ~5.5 后爬升到稳态），热跑 prefill 应显著下降，稳态数据待补；② `res['time']` 起于 `_uocr_generate`，不含图片预处理/gundam 切片与模型加载；③ 流式 `TextStreamer` 逐 token decode/print 开销含在 decode TPS 内，基准测试建议 `eval_mode=True` 去除。
-- 定位结论：5080 单请求 ~24s/页（冷）≈ 148 页/时，符合 16G 卡"功能验证/小批量"定位（deployment.md §1）；PRD ≥600 页/时/卡验收按既定定位在 A 级卡验证。
-- 质量观察：211 token 处以自然 EOS 结束（与前轮逐 token 流完全一致，确定性输出），正文止于"…者可"呈半句截断，页码块误识别为片假名"リョ"——是否早停需对照该页真值判断，热跑命令已带 `finish_reason` 输出。
-- 待补：同进程双跑热稳态（prefill 降幅 + 纯 decode TPS）、100 页批量吞吐（`BATCH_PAGES=1`）。
+- 解读：① 冷启动 prefill 含 DASH block-sparse Triton kernel JIT 编译（解码前几步 TPS 仅 ~5.5 后爬升到稳态），热稳态复测证实（见下）；② `res['time']` 起于 `_uocr_generate`，不含图片预处理/gundam 切片与模型加载；③ 流式 `TextStreamer` 逐 token decode/print 开销含在 decode TPS 内，基准测试建议 `eval_mode=True` 去除。
+- 热稳态复测（同进程双跑，`eval_mode=True` 去 streamer 开销、`save_results=False`）：run1 prefill 2.92s / 10.8 t/s（进程内残留预热）；**run2 即稳态——prefill 0.35s（较冷启动 6.00s 降 94%，证实冷启动开销为 Triton JIT 主导）、decode 11.5 t/s（与带流式打印口径持平 → TextStreamer 开销可忽略，11.5 即真实 decode 速度）、total 18.71s ≈ 190 页/时**。两轮 `finish_reason=stop`，tokens=211 与冷启动逐字符一致（temperature=0 确定性）。
+- decode 效率注记：11.5 t/s ≈ 87ms/token，远低于 3.34B bf16 权重流式的显存带宽理论上限——主要受逐 token 框架开销（Python 解码循环 + kernel 启动 + DASH 路由/entmax）影响，HF eager 路线单卡顺序属正常水平；吞吐量级提升依赖批量与服务化路线（A 级卡，deployment.md §1）。
+- 定位结论：5080 单请求 ~24s/页（冷）~ 18.7s/页（热稳态），≈ 148~190 页/时，符合 16G 卡"功能验证/小批量"定位（deployment.md §1）；PRD ≥600 页/时/卡验收按既定定位在 A 级卡验证。
+- 质量观察：211 token 处以自然 EOS 结束（双跑 `finish_reason=stop` + 与前轮逐 token 流逐字符一致），正文止于"…者可"呈半句截断，页码块误识别为片假名"リョ"——是否早停需对照该页真值判断。
+- 待补：100 页批量吞吐（`BATCH_PAGES=1`；稳态口径端到端预计 ~19-20s/页 量级，待实测修正）。

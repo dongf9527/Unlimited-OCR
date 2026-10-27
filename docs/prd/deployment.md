@@ -178,7 +178,7 @@ python utils/process_unlimitedOCR2.py --help   # 后处理：页切分/标题树
 | 跨页表格合并变差 | 检查分批边界是否切在同一段表格中间；批大小 ≥ 10 页/批可覆盖绝大多数跨页表格 |
 | 加载即报 transformers 内部 API 缺失 | 环境混入 transformers 5.x，回退 `transformers==4.52.1 tokenizers==0.21.4` 并重建环境（勿在共享环境修补） |
 
-> **RTX 5080 实测基线（2026-10-28，冷启动单页 gundam，S=1519 / 211 token）**：prefill 6.00s（含 DASH Triton JIT 编译）/ decode 11.5 t/s / 总 24.4s（含流式打印开销，`eval_mode=True` 可去除）≈ 148 页/时——16G 卡定位功能验证/小批量，≥600 页/时/卡验收在 A 级卡。测速方法与热跑注意事项见 `env-compat-eval.md` §7/§8。
+> **RTX 5080 实测基线（2026-10-28，单页 gundam，S=1519 / 211 token）**：冷启动 prefill 6.00s（含 DASH Triton JIT）/ 总 24.4s ≈ 148 页/时；**热稳态（同进程二次调用）prefill 0.35s / decode 11.5 t/s / 总 18.7s ≈ 190 页/时**，`finish_reason=stop` 自然 EOS。16G 卡定位功能验证/小批量，≥600 页/时/卡验收在 A 级卡。测速方法与口径见 `env-compat-eval.md` §7/§8。
 
 ## 7. 验收清单
 
