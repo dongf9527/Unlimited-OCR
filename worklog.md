@@ -41,3 +41,23 @@ Stage Summary:
   2. Unlimited-OCR-深度拆解报告.md（Markdown 源文档，中文 8001 字）
   3. charts/benchmark_ranking.png + charts/radar_subscores.png（可复用图表资产）
 - 可恢复脚本：scripts/gen_charts.py、scripts/report_part*.md、scripts/docx_gen/*（改内容只需编辑 content_part*.js 后重跑生成链）
+
+---
+Task ID: 3
+Agent: main (Z.ai)
+Task: 应用户追问（RTX 5080 16GB 能否部署），在报告第 7 章新增"消费级显卡部署实践"一节，同步 Word 与 Markdown
+
+Work Log:
+- 回答用户"5080 16G 能否部署"：结论为 Transformers 路线单页/顺序多页可行（峰值约 10-13GB），SGLang 服务化不建议；WebSearch 核实 RTX 5080 为 Blackwell sm_120，需驱动 570+ / CUDA 12.8+ / torch 2.7.0+cu128 起才有 sm_120 内核，FA2 对消费级 Blackwell 支持滞后建议用 SDPA
+- 定位插入点：第 7 章原 7.4/7.5 之后无交叉引用，插入为新 7.4 并顺延旧 7.4→7.5、7.5→7.6；新增 2 张表使 part3 表 5-9 顺延为表 7-11（正文无表号引用，安全）
+- Markdown（download/Unlimited-OCR-深度拆解报告.md）：插入 7.4 全节（引言 + 表：显存预算拆解 + 预算解读 + 坑一 Blackwell 自检代码 + 坑二 FA2/SDPA 代码 + 运行参数三条 + 表：16GB 能力边界 + 定位建议），7.1 务实建议补 16GB 条目，第 11 章第 1 步补 16GB 提示；中文字数 8001→9060
+- content_part2.js：7.1 建议段补 16GB 句；插入 7.4 全部块（h2/p/table×2/code×2）；标题顺延 7.5/7.6；content_part3.js：5 张表 cap 顺延 + 第 11 章第 1 步更新
+- 修复 1 处运行时错误：表 5"峰值合计"行加粗单元格未按 [["文本",1]] 双层嵌套（与既往表 8 同类问题）
+- 重跑生成链：node generate.js → add_toc_placeholders --auto（35 条，+1）→ fix_toc_dup.py（移除 1 条残留 hyperlink）→ postprocess_footers.py（3 节 ROMAN/arabic 正常）→ postcheck.py 9/9 通过（0 错 0 警）
+- LibreOffice 转 PDF 验证：总页数 24→26；7.4 实际渲染于正文 12-14 页，表 5/表 6、代码块、加粗行、页脚页码均正常；TOC 占位页码为预估值属既有机制（Word 内"更新域"刷新）
+
+Stage Summary:
+- 交付物已更新（/home/z/my-project/download/）：
+  1. 百度Unlimited-OCR深度拆解报告.docx —— 26 页，11 章不变，第 7 章扩为 7.1-7.6，表格 9→11 张
+  2. Unlimited-OCR-深度拆解报告.md —— 中文字数 9060，7.4-7.6 编号已顺延
+- 可复现管线不变：编辑 scripts/docx_gen/content_part*.js 后重跑生成链即可

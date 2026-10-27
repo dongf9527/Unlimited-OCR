@@ -225,6 +225,7 @@ BENCHMARKS = {'MPDocBench': 131072, 'MarathonDocBench': 786432}
 
 **给 NVIDIA GPU 用户的务实建议**：
 - **24GB 卡（RTX 4090/3090）**：跑 Transformers 路线的单页与中小批量（≤10 页）推理完全可行（权重 6.7GB + 激活 + KV 余量充足）；SGLang 服务需压缩配置（降低 max-running-requests、减小页窗口、mem-fraction 降到 0.6 左右试验）。
+- **16GB 卡（RTX 5080 等）**：Transformers 路线的单页与顺序多页解析可行（显存预算约 10-13GB），但需注意 Blackwell 架构的环境适配；SGLang 服务化不建议尝试。显存预算与环境自检详见 7.4 节。
 - **48GB 卡（A6000/L40S）**：SGLang 服务化舒适区，官方参数基本可直接套用。
 - **80GB 卡（A800/H800/A100）**：官方完整复现环境，64 并发、长文档全量参数无压力。
 - 显存不是唯一瓶颈：**长文档总耗时随页数线性增长**（每页都要视觉编码），3600 页实测耗时约 1.5 小时即 1.5 秒/页，规划批量任务时请按此量级预估。
@@ -305,7 +306,59 @@ python -m sglang.launch_server \
   --host 0.0.0.0 --port 10000
 ```
 
-### 7.4 调用端：OpenAI 兼容 API
+### 7.4 消费级显卡部署实践（RTX 5080 16GB 案例）
+
+7.1 节将 24GB 视为消费级下限，本节把边界进一步下探，以 **RTX 5080（16GB GDDR7，Blackwell 架构，计算能力 sm_120）** 为案例给出 16GB 显存的可行性边界。结论先行：**Transformers 路线的单页解析与顺序多页解析可以在 16GB 上稳定运行；SGLang 服务化路线则不建议在 16GB 卡上尝试。** 该结论的依据来自显存预算拆解与架构适配两方面，下面分别展开。
+
+**单页顺序推理的显存预算拆解（BF16）**：
+
+| 显存项 | 估算占用 | 说明 |
+| --- | --- | --- |
+| 模型权重（BF16） | 约 6.7GB | 3.34B 参数全量驻留；MoE 每 token 仅激活 0.5B，但权重不能只装激活部分 |
+| 视觉编码器（SAM ViT-B + CLIP-L） | 约 0.5-1GB | 双塔编码器参数量很小 |
+| 视觉编码激活值 | 约 1-2GB | 高分辨率输入与 gundam 动态切片时的中间张量峰值 |
+| KV Cache | 百 MB 级 | SR-SWA 每步固定 512 token 工作参考集，KV 不随页数线性累积 |
+| CUDA 上下文与框架开销 | 约 1-1.5GB | PyTorch、cuBLAS 工作区与分配器元数据 |
+| **峰值合计** | **约 10-13GB** | batch=1、页面顺序处理的典型区间 |
+
+16GB 装得下单请求推理，但余量不算富裕：batch=1 的顺序处理没有问题，2-4 路并发则需要精打细算甚至频繁触发显存回收。这份余量本身就是 v2 架构红利的直接体现——若 KV 像传统全注意力那样随页数线性增长，数十页上下文在 16GB 上根本无法容纳。上表为估算区间，实际峰值与页图分辨率、切片数量相关，首次跑批时建议用 `nvidia-smi` 全程观察。
+
+**坑一：Blackwell 架构适配（比显存更先遇到）**。5080 属于 Blackwell 架构（计算能力 sm_120），要求驱动 570 系列以上、PyTorch 构建的 CUDA 版本不低于 12.8——自 torch 2.7.0+cu128 构建起才包含 sm_120 内核。官方 v2 测试栈（torch 2.13.0）不存在此问题，但若沿用旧构建（cu118/cu121）或来源不明的镜像分发，推理时会直接报错 `NVIDIA GeForce RTX 5080 with CUDA capability sm_120 is not compatible with the current PyTorch installation`。因此装完环境后必须先做内核自检：
+
+```bash
+# Blackwell 消费卡环境自检（两步都要过）
+python -c "import torch; print(torch.__version__, torch.version.cuda)"
+python -c "import torch; print(torch.cuda.get_arch_list())"
+# 输出必须包含 sm_120，否则报 no kernel image / not compatible 错误
+```
+
+**坑二：FlashAttention-2 慎装**。FA2 对消费级 Blackwell 的支持明显滞后于数据中心卡，直接 pip 安装容易编译失败或运行崩溃，社区反馈包括崩溃与速度异常。务实做法是加载模型时显式指定 PyTorch 原生 SDPA 注意力实现——它对 sm_120 的覆盖由 PyTorch 官方维护，稳定性远好于自行编译 flash-attn：
+
+```python
+model = AutoModel.from_pretrained(model_name, trust_remote_code=True,
+                                  torch_dtype=torch.bfloat16,
+                                  attn_implementation="sdpa").eval().cuda()
+```
+
+**运行参数三条建议**：
+
+1. 设 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`，开启可扩展分段分配以降低碎片导致的假性 OOM，小显存卡必开（与 7.3 节 SGLang 启动脚本中同一变量的作用相同）；
+2. 保持 batch=1、页面顺序处理，速度按官方长文档实测的约 1.5 秒/页量级预估即可，学习与单文档场景完全够用；
+3. 不必担心长文档上限——v1 的 32K 上下文约 40 页上限由滑动窗口机制决定，与显存无关，16GB 卡同样能顺序跑完整本长文档。
+
+**16GB 显卡的能力边界**：
+
+| 场景 | 可行性 | 原因与说明 |
+| --- | --- | --- |
+| 单页解析（gundam 模式） | 可行 | 峰值约 10-13GB，16GB 装得下且有余量 |
+| 长文档顺序解析（base 模式） | 可行 | KV 不随页数累积，耗时按约 1.5 秒/页线性预估 |
+| SGLang 服务化 | 不建议 | 官方在 A800-80GB 测试，需定制 wheel 与一组环境变量调优；16GB 极易触发 462MiB SAM 偏置 OOM 与 KV 池预分配失败 |
+| 16 路级高并发 / 批量压测 | 不可行 | 并发请求槽、CUDA Graph 与激活显存成倍增长，16GB 无法容纳 |
+| INT8 权重量化（torchao 等） | 可试验 | 权重可压至约 3.5GB，但 MoE 量化兼容性无官方保证，精度需按第 8 章基准自行回归 |
+
+**定位建议**：把 16GB 卡当作学习与单文档工作机最为合适——跑通 7.2 节路线、验证 4.3 节的结构化输出、调试后处理脚本、解析私有文档都是舒适区。若目标是 9.1 节的服务化封装或高并发生产部署，建议租用 A800/H800 或升级到 24GB 以上设备，再把 SGLang 路线纳入计划。
+
+### 7.5 调用端：OpenAI 兼容 API
 
 ```python
 payload = {
@@ -325,7 +378,7 @@ payload = {
 # POST http://127.0.0.1:10000/v1/chat/completions
 ```
 
-### 7.5 常见坑清单（部署前必读）
+### 7.6 常见坑清单（部署前必读）
 
 1. **462MiB OOM**：SAM 相对位置偏置默认一次申请约 462MiB，显存紧张时必设 `SGLANG_OPT_UOCR_SAM_REL_POS_BIAS_MB=64`（官方确认数值等价、峰值更低）。
 2. **cuda-graph 桶不匹配**：`--cuda-graph-bs-prefill` 最大桶若小于 `--max-prefill-tokens`，超限批次静默回退 eager 模式，吞吐骤降且无报错。
@@ -461,7 +514,7 @@ SGLang 定制 wheel 已经提供了 OpenAI 兼容的高性能底座，二开的�
 
 **五步进阶路线**（对应 NVIDIA GPU 环境）：
 
-1. **第 1 步 · 跑通单页**：24GB+ 显卡按 7.2 节装 Transformers 环境，下载权重（约 6.7GB），对一张论文截图跑 `model.infer()`（gundam 模式），观察输出的 `<BLOCK>` 结构与 bbox；
+1. **第 1 步 · 跑通单页**：24GB+ 显卡按 7.2 节装 Transformers 环境（16GB 卡同样可行，显存预算与环境适配见 7.4 节），下载权重（约 6.7GB），对一张论文截图跑 `model.infer()`（gundam 模式），观察输出的 `<BLOCK>` 结构与 bbox；
 2. **第 2 步 · 多页与后处理**：找一份 20-50 页 PDF，PyMuPDF 转 300dpi 页图，`model.infer_multi()` 一次解析，再跑 `utils/process_unlimitedOCR2.py` 得到 Markdown，重点检查跨页表格合并质量；
 3. **第 3 步 · 服务化压测**：按 7.3 节起 SGLang 服务（80GB 卡可直接套官方参数，24GB 卡先降配试验），用 OpenAI SDK 写并发客户端压测，记录吞吐与首 token 延迟基线；
 4. **第 4 步 · 领域微调**：收集 200-1000 张自有场景页图，按 9.2 节格式构造标注，用 ms-swift 跑 LoRA，对比微调前后的子项得分；

@@ -11,7 +11,7 @@ module.exports = {
       ["MPDocBench 是面向数十页级多页文档的公开基准（433 份文档、3246 页）；MarathonDocBench 是百度自建的百页级极限基准（100 份 103-300 页文档、20.5 万标注版面元素）。", 0],
       ["两个基准上的排名如下：", 0],
     ]},
-    { t: "table", cap: "表 5  MPDocBench（数十页级）综合得分排名", w: [12, 44, 22, 22],
+    { t: "table", cap: "表 7  MPDocBench（数十页级）综合得分排名", w: [12, 44, 22, 22],
       head: ["排名", "模型", "类型", "综合得分"],
       rows: [
         ["1", [["Unlimited OCR 2", 1]], "开源专用 OCR", [["84.59", 1]]],
@@ -24,7 +24,7 @@ module.exports = {
         ["8", "Kimi-K3", "闭源通用", "60.77"],
       ],
     },
-    { t: "table", cap: "表 6  MarathonDocBench（百页级）综合得分排名", w: [12, 44, 22, 22],
+    { t: "table", cap: "表 8  MarathonDocBench（百页级）综合得分排名", w: [12, 44, 22, 22],
       head: ["排名", "模型", "类型", "综合得分"],
       rows: [
         ["1", [["Unlimited OCR 2", 1]], "开源专用 OCR", [["77.06", 1]]],
@@ -48,7 +48,7 @@ module.exports = {
     { t: "p", x: [
       ["把综合分拆到五个能力子项，可以更准确地判断模型适合什么任务：", 0],
     ]},
-    { t: "table", cap: "表 7  五维子项得分（MPDocBench / MarathonDocBench）", w: [22, 26, 26, 26],
+    { t: "table", cap: "表 9  五维子项得分（MPDocBench / MarathonDocBench）", w: [22, 26, 26, 26],
       head: ["能力子项", "MPDocBench", "MarathonDocBench", "点评"],
       rows: [
         ["文本内容", "94.8", "89.6", "核心基本功扎实"],
@@ -61,7 +61,7 @@ module.exports = {
     { t: "img", src: CH + "/radar_subscores.png", w: 430, cap: "图 2  Unlimited OCR 2 五维能力雷达图（两个基准）" },
 
     { t: "h2", x: "8.3  开源 OCR 与文档解析模型横向对比" },
-    { t: "table", cap: "表 8  主流开源方案横向对比", w: [17, 12, 10, 12, 25, 24],
+    { t: "table", cap: "表 10  主流开源方案横向对比", w: [17, 12, 10, 12, 25, 24],
       head: ["模型", "开发方", "参数量", "协议", "长文档机制", "关键成绩 / 定位"],
       rows: [
         [[["Unlimited OCR 2", 1]], "百度", "3.34B", "MIT", "SR-SWA + 无限解码", "MPDoc 84.6 / Marathon 77.1（自报），长文档开源唯一解"],
@@ -164,7 +164,7 @@ module.exports = {
       ["结合 NVIDIA GPU 环境，建议按以下五步进阶，每一步都有明确的验证目标：", 0],
     ]},
     { t: "olist", items: [
-      [["跑通单页：", 1], ["24GB 以上显卡按第 7.2 节装 Transformers 环境，下载权重（约 6.7GB），对一张论文截图跑 model.infer（gundam 模式），观察输出的 BLOCK 结构与 bbox 坐标。", 0]],
+      [["跑通单页：", 1], ["24GB 以上显卡按第 7.2 节装 Transformers 环境（16GB 卡同样可行，显存预算与环境适配见第 7.4 节），下载权重（约 6.7GB），对一张论文截图跑 model.infer（gundam 模式），观察输出的 BLOCK 结构与 bbox 坐标。", 0]],
       [["多页与后处理：", 1], ["找一份 20-50 页 PDF，用 PyMuPDF 转 300dpi 页图，model.infer_multi 一次解析，再跑 process_unlimitedOCR2.py 得到 Markdown，重点检查跨页表格合并质量。", 0]],
       [["服务化压测：", 1], ["按第 7.3 节起 SGLang 服务（80GB 卡可直接套官方参数，24GB 卡先降配试验），用 OpenAI SDK 写并发客户端压测，记录吞吐与首 token 延迟基线。", 0]],
       [["领域微调：", 1], ["收集 200-1000 张自有场景页图，按第 9.2 节格式构造标注，用 ms-swift 跑 LoRA，对比微调前后的子项得分。", 0]],
@@ -173,7 +173,7 @@ module.exports = {
     { t: "p", x: [
       ["官方资源入口汇总如下，建议从 GitHub README 与 HuggingFace 模型卡开始，再精读技术报告中的 SR-SWA 与无限解码两章。", 0],
     ]},
-    { t: "table", cap: "表 9  官方资源清单", w: [30, 70],
+    { t: "table", cap: "表 11  官方资源清单", w: [30, 70],
       head: ["资源", "地址 / 说明"],
       rows: [
         ["GitHub 仓库", "https://github.com/baidu/Unlimited-OCR"],

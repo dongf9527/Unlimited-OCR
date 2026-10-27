@@ -139,6 +139,7 @@ module.exports = {
     { t: "p", x: [
       ["给 NVIDIA GPU 用户的务实建议：", 1],
       ["24GB 卡（RTX 4090 / 3090）跑 Transformers 路线的单页与中小批量（10 页以内）推理完全可行；SGLang 服务需压缩配置（降低 max-running-requests、减小页窗口、mem-fraction 降到 0.6 左右试验）。", 0],
+      ["16GB 卡（RTX 5080 等）跑 Transformers 路线的单页与顺序多页解析可行（显存预算约 10-13GB），但需注意 Blackwell 架构的环境适配；SGLang 服务化不建议尝试，显存预算与环境自检详见 7.4 节。", 0],
       ["48GB 卡（A6000 / L40S）是 SGLang 服务化的舒适区，官方参数基本可直接套用；80GB 卡（A800 / H800 / A100）即官方完整复现环境，64 并发与长文档全量参数无压力。", 0],
       ["还需注意：显存不是唯一瓶颈，长文档总耗时随页数线性增长（每页都要视觉编码），3600 页实测耗时约 1.5 小时即每页 1.5 秒，规划批量任务时请按此量级预估。", 0],
     ]},
@@ -227,7 +228,71 @@ module.exports = {
       "# cuda-graph-config 的 full_prefill_max_req 默认 8，会使 16/32 并发回退 eager。",
     ]},
 
-    { t: "h2", x: "7.4  调用端：OpenAI 兼容 API" },
+    { t: "h2", x: "7.4  消费级显卡部署实践（RTX 5080 16GB 案例）" },
+    { t: "p", x: [
+      ["7.1 节将 24GB 视为消费级下限，本节把边界进一步下探，以 RTX 5080（16GB GDDR7，Blackwell 架构，计算能力 sm_120）为案例给出 16GB 显存的可行性边界。", 0],
+      ["结论先行：Transformers 路线的单页解析与顺序多页解析可以在 16GB 上稳定运行；SGLang 服务化路线则不建议在 16GB 卡上尝试。", 0],
+      ["该结论的依据来自显存预算拆解与架构适配两方面，下面分别展开。", 0],
+    ]},
+    { t: "table", cap: "表 5  RTX 5080（16GB）单页顺序推理显存预算拆解", w: [30, 20, 50],
+      head: ["显存项", "估算占用", "说明"],
+      rows: [
+        ["模型权重（BF16）", "约 6.7GB", "3.34B 参数全量驻留；MoE 每 token 仅激活 0.5B，但权重不能只装激活部分"],
+        ["视觉编码器（SAM ViT-B + CLIP-L）", "约 0.5-1GB", "双塔编码器参数量很小"],
+        ["视觉编码激活值", "约 1-2GB", "高分辨率输入与 gundam 动态切片时的中间张量峰值"],
+        ["KV Cache", "百 MB 级", "SR-SWA 每步固定 512 token 工作参考集，KV 不随页数线性累积"],
+        ["CUDA 上下文与框架开销", "约 1-1.5GB", "PyTorch、cuBLAS 工作区与分配器元数据"],
+        [[["峰值合计", 1]], [["约 10-13GB", 1]], "batch=1、页面顺序处理的典型区间"],
+      ],
+    },
+    { t: "p", x: [
+      ["从预算看，16GB 装得下单请求推理但余量不算富裕：batch=1 的顺序处理没有问题，2-4 路并发则需要精打细算甚至频繁触发显存回收。", 0],
+      ["这份余量本身就是 v2 架构红利的直接体现——若 KV 像传统全注意力那样随页数线性增长，数十页上下文在 16GB 上根本无法容纳。", 0],
+      ["需要提醒的是，上表为估算区间，实际峰值与页图分辨率、切片数量相关，首次跑批时建议用 nvidia-smi 全程观察。", 0],
+    ]},
+    { t: "p", x: [
+      ["对 RTX 5080 而言，比显存更先遇到的是架构适配问题。", 0],
+      ["5080 属于 Blackwell 架构（计算能力 sm_120），要求驱动 570 系列以上、PyTorch 构建的 CUDA 版本不低于 12.8——自 torch 2.7.0+cu128 构建起才包含 sm_120 内核。", 0],
+      ["官方 v2 测试栈（torch 2.13.0）不存在此问题，但若沿用旧构建（cu118 / cu121）或来源不明的镜像分发，推理时会直接报错 NVIDIA GeForce RTX 5080 with CUDA capability sm_120 is not compatible with the current PyTorch installation。", 0],
+      ["因此装完环境后必须先做内核自检：", 0],
+    ]},
+    { t: "code", lines: [
+      "# Blackwell 消费卡环境自检（两步都要过）",
+      "python -c \"import torch; print(torch.__version__, torch.version.cuda)\"",
+      "python -c \"import torch; print(torch.cuda.get_arch_list())\"",
+      "# 输出必须包含 sm_120，否则报 no kernel image / not compatible 错误",
+    ]},
+    { t: "p", x: [
+      ["第二个坑是注意力实现的选择。FlashAttention-2 对消费级 Blackwell 的支持明显滞后于数据中心卡，直接 pip 安装容易编译失败或运行崩溃，社区反馈包括崩溃与速度异常。", 0],
+      ["务实做法是加载模型时显式指定 PyTorch 原生 SDPA 注意力实现——它对 sm_120 的覆盖由 PyTorch 官方维护，稳定性远好于自行编译 flash-attn：", 0],
+    ]},
+    { t: "code", lines: [
+      "model = AutoModel.from_pretrained(model_name, trust_remote_code=True,",
+      "                                  torch_dtype=torch.bfloat16,",
+      "                                  attn_implementation=\"sdpa\").eval().cuda()",
+    ]},
+    { t: "p", x: [
+      ["运行参数上给出三条可直接照做的建议。", 0],
+      ["第一，环境变量设 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True，开启可扩展分段分配以降低碎片导致的假性 OOM，小显存卡必开（与 7.3 节 SGLang 启动脚本中同一变量的作用相同）。", 0],
+      ["第二，保持 batch=1、页面顺序处理，速度按官方长文档实测的每页约 1.5 秒量级预估即可，学习与单文档场景完全够用。", 0],
+      ["第三，不必担心长文档上限——v1 的 32K 上下文约 40 页上限由滑动窗口机制决定，与显存无关，16GB 卡同样能顺序跑完整本长文档。", 0],
+    ]},
+    { t: "table", cap: "表 6  16GB 显卡的能力边界（RTX 5080 案例）", w: [32, 14, 54],
+      head: ["场景", "可行性", "原因与说明"],
+      rows: [
+        ["单页解析（gundam 模式）", "可行", "峰值约 10-13GB，16GB 装得下且有余量"],
+        ["长文档顺序解析（base 模式）", "可行", "KV 不随页数累积，耗时按约 1.5 秒/页线性预估"],
+        ["SGLang 服务化", "不建议", "官方在 A800-80GB 测试，需定制 wheel 与一组环境变量调优；16GB 极易触发 462MiB SAM 偏置 OOM 与 KV 池预分配失败"],
+        ["16 路级高并发 / 批量压测", "不可行", "并发请求槽、CUDA Graph 与激活显存成倍增长，16GB 无法容纳"],
+        ["INT8 权重量化（torchao 等）", "可试验", "权重可压至约 3.5GB，但 MoE 量化兼容性无官方保证，精度需按第 8 章基准自行回归"],
+      ],
+    },
+    { t: "p", x: [
+      ["最后给出 16GB 卡的定位建议：把它当作学习与单文档工作机最为合适——跑通 7.2 节路线、验证 4.3 节的结构化输出、调试后处理脚本、解析私有文档都是舒适区。", 0],
+      ["若目标是 9.1 节的服务化封装或高并发生产部署，建议租用 A800/H800 或升级到 24GB 以上设备，再把 SGLang 路线纳入计划。", 0],
+    ]},
+
+    { t: "h2", x: "7.5  调用端：OpenAI 兼容 API" },
     { t: "p", x: [
       ["服务启动后暴露标准 chat/completions 接口，请求体的关键字段如下（图片以 base64 data URL 形式放入 content 数组，文本指令置于末尾）：", 0],
     ]},
@@ -249,7 +314,7 @@ module.exports = {
       "# POST http://127.0.0.1:10000/v1/chat/completions",
     ]},
 
-    { t: "h2", x: "7.5  常见坑清单（部署前必读）" },
+    { t: "h2", x: "7.6  常见坑清单（部署前必读）" },
     { t: "bullets", items: [
       [["462MiB OOM：", 1], ["SAM 相对位置偏置默认一次申请约 462MiB，显存紧张时必设 SGLANG_OPT_UOCR_SAM_REL_POS_BIAS_MB=64（官方确认数值等价、峰值更低）。", 0]],
       [["cuda-graph 桶不匹配：", 1], ["cuda-graph-bs-prefill 最大桶若小于 max-prefill-tokens，超限批次静默回退 eager 模式，吞吐骤降且无报错。", 0]],
