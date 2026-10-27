@@ -61,3 +61,17 @@ Stage Summary:
   1. 百度Unlimited-OCR深度拆解报告.docx —— 26 页，11 章不变，第 7 章扩为 7.1-7.6，表格 9→11 张
   2. Unlimited-OCR-深度拆解报告.md —— 中文字数 9060，7.4-7.6 编号已顺延
 - 可复现管线不变：编辑 scripts/docx_gen/content_part*.js 后重跑生成链即可
+
+---
+Task ID: 4
+Agent: main (Z.ai)
+Task: 将 GitHub 协作规则（7 条）整理为正式文档存入 docs/，占位符按沙箱实际路径填写
+
+Work Log:
+- 检查沙箱 git 环境：/home/z/my-project 已是 git 仓库（main 分支、身份已配置、远程未配置）；research/Unlimited-OCR 存在克隆带来的嵌套 .git，已在规则 2 细则中注明推送前处理方式
+- 创建 docs/ 目录，写入 docs/github-collaboration-rules.md：规则总览表（7 条）+ 逐条细则（含 conventional commits 速查表、force push 等效情形、rebase 替代方案）+ 当前接入状态表；仓库位置占位符填为 /home/z/my-project/
+- 按规则 1/3 执行本地小步提交（docs: 前缀），推送待使用者提供仓库地址与 token 后进行
+
+Stage Summary:
+- 新增 docs/github-collaboration-rules.md（规则文档 v1.0）
+- 等待接入信息：第 1 步 GitHub 仓库地址，第 2 步访问 token；收到后配置 remote 并执行首次推送
