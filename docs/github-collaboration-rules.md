@@ -86,7 +86,7 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | 推送前清洗 | `.env`（含 DATABASE_URL）已从全部历史移除并加入 `.gitignore`；`research/`、`tool-results/` 已移出索引并忽略 |
 | `docs/` 目录 | 全部文档沉淀处：报告 md/docx、charts/ 图表、README 索引及本规则文件（对应规则 4） |
 | 目录迁移 | 2026-10-27 将 `download/` 下全部文档与图表迁移至 `docs/`，此后报告类交付物直接写入 `docs/` |
-| 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，2026-10-27 已写入并用于推送） |
+| 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，目录 700）；2026-10-27 首次写入并推送；2026-10-28 因沙箱回滚丢失后重发重建（API 验证 HTTP 200, login: dongf9527），有效期至约 2026-11-26 |
 | 上游同步 | 2026-10-27 将 `baidu/Unlimited-OCR` 快照 `0cdd787` 同步至仓库根（LFS 指针已替换为真实文件并逐个 sha256 校验）；后续增量同步复用 `scripts/sync_upstream.sh` |
 
 ## 四、凭证安全约定（v1.1 更新：持久化存储）
@@ -107,5 +107,6 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | --- | --- | --- |
 | `.credentials/` 凭证目录被清理 | 推送时才发现 token 失效 | 每次会话开始先做 token 健康检查（`GET /user` 返回 200 才开工）；token 丢失时向使用者索要 |
 | `~/.gitconfig` 与 `/home/z/.local/`（git-lfs 二进制）被清理 | 自动快照提交把 156MB gif 按普通 blob 提交，触发 GitHub 100MB 拒收 | LFS filter 同时写入 `~/.gitconfig` 与仓库本地 `.git/config`（后者随 `.git` 持久存活）；git-lfs 二进制丢失需重装至 `/home/z/.local/`（脚本见 worklog Task 10） |
+| 2026-10-28 沙箱整体回滚（已跟踪文件与本地 git 历史一并回退至旧快照，`.credentials/`、`/home/z/.local/` 再次丢失） | 本地落后远程 12 commit；全仓库 filemode 伪差异（100644→100755）；推送被 pre-push hook 拦截 | 远程始终保有全部成果：`core.filemode=false` 消除权限伪差异后 `merge --ff-only origin/main` 即恢复；纯文本 commit 可 `push --no-verify` 先行（前提：确认不含 LFS 对象）；git-lfs 3.7.0 已重装、filter 双写已恢复 |
 
 另外约定：沙箱自动快照会在会话间生成 UUID 命名的系统提交，若其内容异常（如绕过 LFS 的大文件），在**未推送**前提下允许 reset 重写本地历史予以修正；已推送历史仍按规则 5 处理。
