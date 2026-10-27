@@ -17,12 +17,12 @@ check_env.py — PDF-OCR 管线（Unlimited-OCR-2）环境自检脚本
 
 退出码：0=无 FAIL；1=存在 FAIL；2=--strict 且存在 WARN
 
-判定基线（来源见各 SPEC 注释）：
-  Python 3.10（禁 3.12+）｜torch 2.13.0+cu128｜transformers 4.52.1（trust_remote_code 依赖）
+判定基线（pdf-ocr-prd.md §5.1 v1.1 定稿，2026-10-28）：
+  Python 3.10（conda 独立环境，禁 3.12+）｜torch 2.11.0+cu128｜transformers 4.52.1（trust_remote_code 依赖）
   tokenizers 0.21.4（随 transformers 联动）｜huggingface-hub 0.36.0｜pymupdf 1.27.2.2
   addict 2.4.0 / einops 0.8.2 / easydict 1.13（模型代码确证 import）
-  pillow ≥10｜opencv-python-headless ≥4.9｜python-docx ≥1.1｜reportlab ≥4.0
-  路线 B：sglang wheel(0.5.20.dev10, 绑定 torch 2.13.0) + fastokens 0.3.2
+  pillow 11.x｜opencv-python-headless 5.x｜python-docx 1.2.x｜reportlab ≥4.0（定稿区间）
+  路线 B 已归档（v1.0 基线：torch 2.13.0 + sglang wheel），--route B 按归档基线校验
 """
 
 import argparse
@@ -41,9 +41,9 @@ TORCH_TV_PAIR = {
     "2.12": "0.27", "2.13": "0.28",
 }
 
-# 文档基线版本（pdf-ocr-prd.md §5.1 / deployment.md §2 §3.1 §3.4）
+# 文档基线版本（pdf-ocr-prd.md §5.1 v1.1 定稿 / deployment.md v1.1 §2；依据 env-compat-eval.md）
 PIN = {
-    "torch": "2.13.0",
+    "torch": "2.11.0",   # v1.1 定稿；路线 B 归档基线 2.13.0，--route B 时切换
     "transformers": "4.52.1",
     "tokenizers": "0.21.4",
     "huggingface_hub": "0.36.0",
@@ -53,11 +53,12 @@ PIN = {
     "easydict": "1.13",
     "fastokens": "0.3.2",
 }
-MIN = {
-    "pillow": "10.0",
-    "opencv-python-headless": "4.9",
-    "python-docx": "1.1",
-    "reportlab": "4.0",
+# 实测确认版本的定稿区间（env-compat-eval.md：确认点 pillow 11.0.0 / opencv 5.0.0.93 / python-docx 1.2.0）
+SPEC = {
+    "pillow": ">=11.0,<12",
+    "opencv-python-headless": ">=5.0.0,<6",
+    "python-docx": ">=1.2,<2",
+    "reportlab": ">=4.0",
 }
 # import 名 ≠ 发行名的映射；同名可列多个候选发行名
 DIST_OF = {
@@ -146,10 +147,14 @@ class Report:
         print("-" * 72)
         a_ok = route_a_ok(self)
         b_ok = route_b_ok(self)
+        sglang_absent = any(it == "sglang" and "未安装" in m for lv, it, m, _ in self.rows)
         print(f"路线 A（Transformers 单机）: "
               f"{c('g', '可部署') if a_ok else c('r', '存在阻断项')}")
-        print(f"路线 B（SGLang 服务化）:   "
-              f"{c('g', '可部署') if b_ok else c('r', '存在阻断项')}")
+        if sglang_absent and route in ("both", "A"):
+            b_line = c("d", "未部署（路线 B 已归档，见 docs/archive/）")
+        else:
+            b_line = c("g", "可部署") if b_ok else c("r", "存在阻断项")
+        print(f"路线 B（SGLang 服务化，归档）:   {b_line}")
         return 0 if not self.has(FAIL) else 1
 
     def to_json(self):
@@ -272,15 +277,15 @@ def check_torch_stack(rep, route):
         return
     pin = vtuple(PIN["torch"])
     if vtuple(tv) == pin:
-        rep.add(PASS, "torch", f"torch {tv} == 文档基线 {PIN['torch']}")
+        rep.add(PASS, "torch", f"torch {tv} == v1.1 定稿基线 {PIN['torch']}")
     elif route == "B":
         rep.add(FAIL, "torch",
-                f"torch {tv} ≠ {PIN['torch']}：路线 B 的 SGLang wheel 按基线 torch 编译，版本必须一致",
+                f"torch {tv} ≠ {PIN['torch']}：归档路线 B 的 SGLang wheel 按该基线 torch 编译，版本必须一致",
                 f"pip install torch=={PIN['torch']} --index-url {CU_INDEX}")
     else:
         rep.add(WARN, "torch",
-                f"torch {tv} ≠ 文档基线 {PIN['torch']}：路线 A 大概率可用（模型代码仅用标准算子），但未经上游验证",
-                "跑 deployment.md §2 冒烟测试确认；CUDAGraph/自定义核类特性以 2.13.0 为准")
+                f"torch {tv} ≠ v1.1 定稿基线 {PIN['torch']}：模型代码仅用标准算子，其他版本大概率可跑但未经定稿验证",
+                "按 deployment.md §2 重装定稿版本；如需 SGLang（已归档）见 docs/archive/deployment-v1.0.md")
     # torchvision 配对
     tvv, _ = dist_version(rep, "torchvision")
     if tvv:
@@ -352,19 +357,16 @@ def check_model_side_libs(rep):
             rep.add(PASS, name, f"{name} {v}")
 
 
-def check_generic(rep, name, spec, why, fail_if_missing=False, note=None):
+def check_generic(rep, name, spec, why, fail_if_missing=False):
     v, dist = dist_version(rep, name)
     if not v:
         lvl = FAIL if fail_if_missing else WARN
         rep.add(lvl, name, f"未安装 {name}：{why}", f"pip install '{name}{spec}'")
         return
     if eval_spec(v, spec):
-        msg = f"{name} {v} 满足 {spec}"
-        if note and vtuple(v)[0] > vtuple(spec.split(">=")[-1])[0]:
-            msg += f"（{note}）"
-        rep.add(PASS, name, msg)
+        rep.add(PASS, name, f"{name} {v} 满足定稿区间 {spec}")
     else:
-        rep.add(WARN, name, f"{name} {v} 不满足 {spec}：{why}",
+        rep.add(WARN, name, f"{name} {v} 不满足定稿区间 {spec}：{why}",
                 f"pip install '{name}{spec}'")
 
 
@@ -438,18 +440,20 @@ def check_disk(rep, model_dir):
 def check_route_b(rep, route):
     if route not in ("B", "both"):
         return
+    absent_lvl = WARN if route == "B" else INFO
     sv, _ = dist_version(rep, "sglang")
     if not sv:
-        rep.add(WARN, "sglang", "路线 B 未安装（生产默认路线；仅用路线 A 可忽略）",
-                "uv pip install wheel/sglang-0.5.20.dev10+g8d62f5fb9c-py3-none-any.whl（仓库 wheel/ 已归档）")
+        rep.add(absent_lvl, "sglang",
+                "路线 B 未安装（该路线已随 v1.0 归档，Transformers 单机路线不受影响）",
+                "恢复流程见 docs/archive/deployment-v1.0.md §3（归档基线 torch 2.13.0）")
         return
-    rep.add(PASS, "sglang", f"sglang {sv}")
+    rep.add(PASS, "sglang", f"sglang {sv}（归档路线 B 组件，按 v1.0 基线校验）")
     fv, _ = dist_version(rep, "fastokens")
     if not fv:
         rep.add(WARN, "fastokens", f"未安装 fastokens（--tokenizer-backend fastokens 需要 {PIN['fastokens']}）",
                 f"pip install fastokens=={PIN['fastokens']}")
     elif vtuple(fv) != vtuple(PIN["fastokens"]):
-        rep.add(WARN, "fastokens", f"fastokens {fv} ≠ 基线 {PIN['fastokens']}",
+        rep.add(WARN, "fastokens", f"fastokens {fv} ≠ 归档基线 {PIN['fastokens']}",
                 f"pip install fastokens=={PIN['fastokens']}")
     else:
         rep.add(PASS, "fastokens", f"fastokens {fv}")
@@ -495,21 +499,22 @@ def main():
         _COLOR = False
 
     rep = Report()
+    if args.route == "B":
+        PIN["torch"] = "2.13.0"            # 路线 B 按归档 v1.0 基线校验（SGLang wheel 绑定）
     if not args.json:                       # JSON 模式 stdout 必须是纯 JSON（CI 解析）
         print(f"{c('b', 'PDF-OCR 管线环境自检')}  路线={args.route}  "
-              f"解释器={sys.executable}\n基线来源: docs/prd/pdf-ocr-prd.md §5.1 + deployment.md\n" + "-" * 72)
+              f"解释器={sys.executable}\n基线来源: docs/prd/pdf-ocr-prd.md §5.1 (v1.1) + deployment.md\n" + "-" * 72)
 
     check_python(rep)
     check_gpu(rep, args.route)
     check_torch_stack(rep, args.route)
     check_transformers(rep, args.route)
     check_model_side_libs(rep)
-    check_generic(rep, "pillow", f">={MIN['pillow']}", "图像 IO（PRD ≥10.0）", fail_if_missing=True)
-    check_generic(rep, "opencv-python-headless", f">={MIN['opencv-python-headless']}",
-                  "水印抑制与图像裁剪（PRD ≥4.9）", fail_if_missing=False,
-                  note="已装 5.x 大版本，基础 API 兼容，建议随冒烟一并验证")
-    check_generic(rep, "python-docx", f">={MIN['python-docx']}", "DOCX 导出（deployment.md §3.4）")
-    check_generic(rep, "reportlab", f">={MIN['reportlab']}", "文本型 PDF 导出（deployment.md §3.4）")
+    check_generic(rep, "pillow", SPEC["pillow"], "图像 IO（v1.1 定稿，实测确认 11.0.0）", fail_if_missing=True)
+    check_generic(rep, "opencv-python-headless", SPEC["opencv-python-headless"],
+                  "水印抑制与图像裁剪（v1.1 定稿，实测确认 5.0.0.93）", fail_if_missing=True)
+    check_generic(rep, "python-docx", SPEC["python-docx"], "DOCX 导出（v1.1 定稿，实测确认 1.2.0）")
+    check_generic(rep, "reportlab", SPEC["reportlab"], "文本型 PDF 导出（PRD ≥4.0）")
     check_generic(rep, "pymupdf", f"=={PIN['pymupdf']}", "PDF 渲染（PRD 基线 1.27.2.2）")
     check_hub_and_weights(rep, args.model_dir)
     check_disk(rep, args.model_dir)
