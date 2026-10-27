@@ -123,3 +123,22 @@ Work Log:
 Stage Summary:
 - 远程与本地同步于 e124a15；token 有效期至约 2026-11-26，到期前提醒轮换
 - 后续所有推送/拉取自动复用 .credentials/github-token，无需使用者再提供
+
+---
+Task ID: 7
+Agent: main (Z.ai)
+Task: 将上游 baidu/Unlimited-OCR 代码与文档同步至新仓库根级
+
+Work Log:
+- 更新 research/Unlimited-OCR 克隆至 origin/main（0cdd787），确认无子模块、总体积 104K
+- 发现上游重度使用 Git LFS（pdf/png/gif/whl/mp4 全是指针文件），仓库内无 git-lfs；改用 GitHub 媒体端点下载真实文件
+- scripts/sync_upstream.sh：rsync 工作树（排除 .git/.gitattributes/.gitignore）→ 逐个下载 LFS 真实文件并按指针 sha256 校验（6 个文件全部通过，含 149MB gif、15MB whl）
+- HarryPotter.gif 实际 149MB 超 GitHub 100MB 普通单文件限制 → 仅 *.gif 启用 LFS：apt 装 git-lfs 失败（无 sudo），改官方二进制包装至 /home/z/.local/（仓库外），filter 以绝对路径写 ~/.gitconfig
+- 根 .gitattributes 适配（仅 gif 走 LFS）；.gitignore 合并上游 Python 项（heredoc 曾被 && 短路，验证后补齐）
+- 提交 e95ed51 并推送成功，LFS 对象上传远程端点（media URL HTTP 200 验证）
+- 更新规则文档目录职责表与接入状态表，追加本日志
+
+Stage Summary:
+- 新仓库根级现包含上游完整快照（0cdd787），docs/、scripts/、worklog.md 共存无冲突
+- 后续增量同步：更新 research/ 克隆 → 复用 scripts/sync_upstream.sh（自动 sha256 校验）→ 提交推送
+- git-lfs 二进制位于 /home/z/.local/bin（PATH 外），相关操作前需 export PATH 或依赖绝对路径 filter

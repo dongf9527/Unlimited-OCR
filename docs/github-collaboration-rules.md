@@ -34,10 +34,13 @@
 
 | 路径 | 职责 |
 | --- | --- |
+| `/home/z/my-project/`（根级） | 上游 `baidu/Unlimited-OCR` 完整快照（README/LICENSE/infer.py/utils/assets/wheel 等），作为二开基线 |
 | `/home/z/my-project/docs/` | 全部文档沉淀：分析报告（md/docx）、图表（charts/）、目录索引与协作规则 |
-| `/home/z/my-project/scripts/` | 生成脚本（Python / Node），可迭代复用 |
+| `/home/z/my-project/scripts/` | 生成与运维脚本（Python / Node / Shell），可迭代复用 |
 | `/home/z/my-project/.credentials/` | git 凭证存储（gitignored，权限 700/600，绝不提交） |
 | `/home/z/my-project/worklog.md` | 多智能体共享工作日志 |
+
+Git LFS 约定：仅 `*.gif` 走 LFS（上游动图 149MB 超 GitHub 普通单文件 100MB 限制，见根级 `.gitattributes`）；pdf/png/whl 以普通 blob 提交；LFS filter 使用绝对路径 `/home/z/.local/bin/git-lfs`（二进制包安装于沙箱用户目录，不入仓库）。
 
 历史说明：早期交付物存放在 `download/`，已于 2026-10-27 全部迁移至 `docs/`；此后新生成的报告类交付物直接写入 `docs/` 并提交推送。
 
@@ -84,6 +87,7 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | `docs/` 目录 | 全部文档沉淀处：报告 md/docx、charts/ 图表、README 索引及本规则文件（对应规则 4） |
 | 目录迁移 | 2026-10-27 将 `download/` 下全部文档与图表迁移至 `docs/`，此后报告类交付物直接写入 `docs/` |
 | 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，2026-10-27 已写入并用于推送） |
+| 上游同步 | 2026-10-27 将 `baidu/Unlimited-OCR` 快照 `0cdd787` 同步至仓库根（LFS 指针已替换为真实文件并逐个 sha256 校验）；后续增量同步复用 `scripts/sync_upstream.sh` |
 
 ## 四、凭证安全约定（v1.1 更新：持久化存储）
 
