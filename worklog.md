@@ -385,3 +385,20 @@ Work Log:
 Stage Summary:
 - "卡住"问题归因为可观测性缺失并闭环（心跳 + 硬上限），仓库 v2 已上 GitHub（abd7f8a）
 - 观察点：第 5 页若在 v2 下被 length 截断（3000 token），即 runaway 页实锤，转 EOS/真值核查线
+
+---
+Task ID: 20
+Agent: main (Z.ai)
+Task: 用户回传 book01 批量完整结果——runaway 页定性闭环 + 实测口径入库
+
+Work Log:
+- 结果解读：10/10 ok、0 fail、0 base 回退（gundam 全程可用无 OOM）；9 个 finish=stop 页 tokens 87~215、wall 8.05~20.81s 与 token 数线性正相关
+- "卡住"终局定性：5.png = runaway 页实锤——3000 token 撞 max_new_tokens=3000 上限（finish=length），wall=264.78s ≈ 4.3 分钟封顶按设计生效；[TPS] 心跳全程 11.3→11.5 t/s 无衰减，属持续正常解码非挂死/劣化（DASH 长解码稳定性旁证）
+- 吞吐修正：正常页均值 16.3s/页 ≈ 221 页/时（与热稳态 190 页/时口径吻合偏优）；summary 的 61.7 页/时为续跑分母（6 页）+ runaway 页双重拉偏，标注不可直接汇报；runaway 率 5% 敏感性 → 整批 ~125 页/时
+- summary 口径缺陷记录：elapsed/avg_wall 按本次续跑分母计、avg_tokens/avg_infer_s 按全 ok 页计，断点续跑场景不可混比（记入文档，脚本暂不改）
+- 文档固化：env-compat-eval.md §8 待补项改为 EOS 真值核查指引 + 新增 §9 页级批量首测；deployment.md §4 快速验证预计改实测、§6 基线注记追加批量口径
+- 待定性遗留：5.png 3000 token 为循环退化 vs 真密排页，待用户对 out/batch50/pages/5/result.md 做 n-gram 重复检测（top-40-gram ≥3 次判 loop）；已向用户提供检测命令与两条处置路径
+
+Stage Summary:
+- book01 批量首测闭环（Task 19 观察点落地）：16G 卡 gundam 顺序单页路线验证通过，正常页 221 页/时口径入库
+- 悬挂项：5.png loop/密排定性 → EOS 早停真值核查 → 100 页放大（需更大图片目录）

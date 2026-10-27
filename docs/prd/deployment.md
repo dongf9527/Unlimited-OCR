@@ -159,7 +159,7 @@ parse_pdf("demo.pdf", "out/demo")
 
 断点续跑：每文档完成后写 `manifest.json`（含 doc_id 与产物哈希），批处理入口启动时先查 manifest，已存在则跳过该文档；单页失败重试 2 次（gundam→base 各一次）后落 `failed_pages.json` 继续，行为约定见 PRD §4.6。
 
-**快速验证（50 页量级 / 图片源）**：`scripts/batch_pages_eval.py` 按**顺序单页**逐页请求（等价 `BATCH_PAGES=1`；勿改用 `infer_multi` 整本模式，16G 必 OOM），实现 `progress.jsonl` 断点续跑（已 ok 页自动跳过、失败页重跑自动重试）、gundam→base 重试、`summary.json` 汇总（成功率/均耗时/均 token/finish 分布）。页内可见性：`tps_interval=100` 心跳（约 9s/行，debug 打印仍被过滤）+ `max_new_tokens=3000` 单页硬上限（≈4.3 分钟封顶，超限 `finish=length` 标记待人工核查）——防个别密页/runaway 页让整批"看似假死"。用法 `python scripts/batch_pages_eval.py [N页数] [图片目录]`，默认 50 页、`~/guwen-model-eval/data/raw/images/book01`；RTX 5080 稳态预计 17~20 分钟（首页 +6s JIT）。
+**快速验证（50 页量级 / 图片源）**：`scripts/batch_pages_eval.py` 按**顺序单页**逐页请求（等价 `BATCH_PAGES=1`；勿改用 `infer_multi` 整本模式，16G 必 OOM），实现 `progress.jsonl` 断点续跑（已 ok 页自动跳过、失败页重跑自动重试）、gundam→base 重试、`summary.json` 汇总（成功率/均耗时/均 token/finish 分布）。页内可见性：`tps_interval=100` 心跳（约 9s/行，debug 打印仍被过滤）+ `max_new_tokens=3000` 单页硬上限（≈4.3 分钟封顶，超限 `finish=length` 标记待人工核查）——防个别密页/runaway 页让整批"看似假死"。用法 `python scripts/batch_pages_eval.py [N页数] [图片目录]`，默认 50 页、`~/guwen-model-eval/data/raw/images/book01`。**RTX 5080 实测（2026-10-28，book01 全 10 页）**：10/10 成功、0 base 回退；正常页（finish=stop）16.3s/页 ≈ 221 页/时，1 页 runaway 被 3000 上限封顶（264.8s，finish=length 待人工核查）——runaway 率 5% 时整批吞吐降至 ~125 页/时，口径详见 `env-compat-eval.md` §9。
 
 ## 5. 导出层依赖与后处理
 
@@ -180,7 +180,7 @@ python utils/process_unlimitedOCR2.py --help   # 后处理：页切分/标题树
 | 跨页表格合并变差 | 检查分批边界是否切在同一段表格中间；批大小 ≥ 10 页/批可覆盖绝大多数跨页表格 |
 | 加载即报 transformers 内部 API 缺失 | 环境混入 transformers 5.x，回退 `transformers==4.52.1 tokenizers==0.21.4` 并重建环境（勿在共享环境修补） |
 
-> **RTX 5080 实测基线（2026-10-28，单页 gundam，S=1519 / 211 token）**：冷启动 prefill 6.00s（含 DASH Triton JIT）/ 总 24.4s ≈ 148 页/时；**热稳态（同进程二次调用）prefill 0.35s / decode 11.5 t/s / 总 18.7s ≈ 190 页/时**，`finish_reason=stop` 自然 EOS。16G 卡定位功能验证/小批量，≥600 页/时/卡验收在 A 级卡。测速方法与口径见 `env-compat-eval.md` §7/§8。
+> **RTX 5080 实测基线（2026-10-28，单页 gundam，S=1519 / 211 token）**：冷启动 prefill 6.00s（含 DASH Triton JIT）/ 总 24.4s ≈ 148 页/时；**热稳态（同进程二次调用）prefill 0.35s / decode 11.5 t/s / 总 18.7s ≈ 190 页/时**，`finish_reason=stop` 自然 EOS。**页级批量首测（book01 全 10 页）**：正常页 16.3s/页 ≈ 221 页/时（与热稳态口径吻合），runaway 页被 `max_new_tokens=3000` 封顶 264.8s 且 TPS 全程 11.3~11.5 t/s 无衰减。16G 卡定位功能验证/小批量，≥600 页/时/卡验收在 A 级卡。测速方法与口径见 `env-compat-eval.md` §7/§8/§9。
 
 ## 7. 验收清单
 

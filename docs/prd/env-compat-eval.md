@@ -82,4 +82,15 @@
 - decode 效率注记：11.5 t/s ≈ 87ms/token，远低于 3.34B bf16 权重流式的显存带宽理论上限——主要受逐 token 框架开销（Python 解码循环 + kernel 启动 + DASH 路由/entmax）影响，HF eager 路线单卡顺序属正常水平；吞吐量级提升依赖批量与服务化路线（A 级卡，deployment.md §1）。
 - 定位结论：5080 单请求 ~24s/页（冷）~ 18.7s/页（热稳态），≈ 148~190 页/时，符合 16G 卡"功能验证/小批量"定位（deployment.md §1）；PRD ≥600 页/时/卡验收按既定定位在 A 级卡验证。
 - 质量观察：211 token 处以自然 EOS 结束（双跑 `finish_reason=stop` + 与前轮逐 token 流逐字符一致），正文止于"…者可"呈半句截断，页码块误识别为片假名"リョ"——是否早停需对照该页真值判断。
-- 待补：100 页批量吞吐（`BATCH_PAGES=1`；稳态口径端到端预计 ~19-20s/页 量级，待实测修正）。
+- 待补：EOS 早停真值核查（10 页 result.md 已齐，页尾"…者可"类断句需对照原图末行判断——古籍按页断行属常态，不能只看语法）。
+
+## 9. 页级批量首测（2026-10-28，RTX 5080，book01 全 10 页）
+
+`scripts/batch_pages_eval.py`（§4 快速验证路线，顺序单页 + 断点续跑）跑完 book01 全册（目录实有 10 页，N_PAGES=50 自动取全；分两次运行经 progress.jsonl 续跑合并）：
+
+- **成功率与模式**：10/10 ok，0 失败，0 次 base 回退——gundam 模式在 16G 卡全程可用，无 OOM。
+- **正常页口径**（9 页 finish=stop，tokens 87~215，wall 8.05~20.81s 且与 token 数线性正相关）：均值 **16.3s/页 ≈ 221 页/时**，与 §8 热稳态 190 页/时（单页 18.7s）口径吻合偏优（样本页较短）；每页 wall 与 infer_s 差合计 <1s，图片预处理开销可忽略。
+- **runaway 页实锤**（§8 观察点闭环）：5.png 生成 3000 token 撞 `max_new_tokens=3000` 硬上限（finish=length），wall=264.78s ≈ 4.3 分钟封顶按设计生效；页内 [TPS] 心跳全程 11.3→11.5 t/s 无衰减——DASH 长解码稳定，属"一直正常解码"而非挂死/劣化。该页 3000 token 为正常页 token 数（87~215）的 14~35 倍，是循环退化（repetition loop）还是真密排页待对 `out/batch50/pages/5/result.md` 定性（n-gram 重复检测：top-40-gram 出现 ≥3 次即判 loop）。
+- **吞吐敏感性**：1 页 runaway ≈ 16 个正常页耗时；runaway 率 5% 时整批吞吐降至 ~125 页/时。处置维持 v2 设计——3000 上限封顶防拖死 + finish=length 标记人工复核，不因个别页调大上限。
+- **summary 口径警示**：`elapsed_s`/`avg_wall_s_per_page`/`pages_per_hour_this_run` 按**本次续跑分母**（6 页）计，`avg_tokens`/`avg_infer_s` 按**全部 ok 页**（10 页）计——断点续跑场景这两组均值不可直接混比；本次 `pages_per_hour_this_run=61.7` 为被 runaway 页 + 续跑分母双重拉偏的整批口径，汇报请用正常页 16.3s/页口径。
+- 100 页验收放大：book01 仅 10 页，需指定更大图片目录复用脚本（`python scripts/batch_pages_eval.py 100 <img_dir>`），脚本与断点逻辑不变。
