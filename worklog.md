@@ -353,3 +353,19 @@ Work Log:
 Stage Summary:
 - 5080 基线定稿（8c706ba）：冷 24.4s/页 / 稳态 18.7s/页 ≈ 190 页/时，decode 11.5 t/s
 - 下一步：100 页批量实测（deployment.md §4）；对照真值核查 EOS 早停
+
+---
+Task ID: 18
+Agent: main (Z.ai)
+Task: 用户提出 100 页批量太多、改跑 50 页——交付页级批量评测脚本并入库
+
+Work Log:
+- 方案定性：16G 卡"50 页批量"= 逐页单请求顺序跑（等价 BATCH_PAGES=1），由脚本控制取页数；明确禁止 infer_multi 整本模式（OOM 风险，deployment.md §1 既定）
+- scripts/batch_pages_eval.py（py_compile 通过）：自然页序取前 N 页 → 逐页 infer（eval_mode 静默 + redirect_stdout 吞逐层 debug 打印）→ progress.jsonl 断点续跑（ok 页跳过/失败页重跑自动重试）→ 单页失败 gundam→base 各一次 + empty_cache 防碎片 → summary.json 汇总（成功率/avg wall/infer/tokens/finish=stop 占比/base 回退次数/失败清单）；argv 支持 N 与图片目录覆盖
+- 默认参数对齐用户环境：IMG_DIR=~/guwen-model-eval/data/raw/images/book01、MODEL=定稿权重路径、OUT_DIR=out/batch50（cwd 相对，与 out/single 同级）
+- deployment.md §4 新增"快速验证（50 页量级/图片源）"注记；提交 b91945e 按 SOP --no-verify 推送成功
+- 预期口径已告知用户：50 页约 17~20 分钟（稳态 18.7s/页 + 首页 6s JIT），跑完回传 summary.json
+
+Stage Summary:
+- 50 页批量实现已交付（heredoc + 仓库脚本 b91945e 双通道），100 页验收可在 50 页结果验证后放大 N 复用
+- 待回传：summary.json（成功率、avg_infer_s、finish 分布）；EOS 早停真值核查仍挂起
