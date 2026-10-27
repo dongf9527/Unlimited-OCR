@@ -88,12 +88,12 @@
 
 `scripts/batch_pages_eval.py`（§4 快速验证路线，顺序单页 + 断点续跑）跑完 book01 全册（目录实有 10 页，N_PAGES=50 自动取全；分两次运行经 progress.jsonl 续跑合并，后又 done=0 全程单次复跑一遍，两轮 10 页 tokens/finish 逐页一致——temperature=0 确定性再证，连 runaway 页都逐 token 复现）：
 
-- **成功率与模式**：10/10 ok，0 失败，0 次 base 回退——gundam 模式在 16G 卡全程可用，无 OOM。
-- **正常页口径**（9 页 finish=stop，tokens 87~215，wall 8.05~20.81s 且与 token 数线性正相关）：均值 **16.3s/页 ≈ 221 页/时**，与 §8 热稳态 190 页/时（单页 18.7s）口径吻合偏优（样本页较短）；每页 wall 与 infer_s 差合计 <1s，图片预处理开销可忽略。
+- **成功率与模式**：10/10 ok，0 失败（三轮复现），0 次 OOM——gundam 模式在 16G 卡全程可用；v3 轮以 **finish_stop=10/10、finish_length=0** 收官（5.png 计入 base 救援产物），batch 产物层面无截断/垃圾页。
+- **正常页口径**（9 页 finish=stop，tokens 87~215，wall 8.05~21.92s 且与 token 数线性正相关；三轮复现逐页 token 数一致——temperature=0 确定性三连证）：均值 **16.0~16.7s/页 ≈ 215~226 页/时**，与 §8 热稳态 190 页/时（单页 18.7s）口径吻合偏优（样本页较短）；每页 wall 与 infer_s 差合计 <1s，图片预处理开销可忽略。
 - **runaway 页封顶行为**（§8 观察点闭环）：5.png 生成 3000 token 撞 `max_new_tokens=3000` 硬上限（finish=length），wall 264.78s（续跑轮）/260.91s（单次轮）≈ 4.3 分钟封顶按设计生效；页内 [TPS] 心跳全程 11.3→12.0 t/s 无衰减——DASH 长解码稳定，属"一直正常解码"而非挂死/劣化。该页 3000 token 为正常页 token 数（87~215）的 14~35 倍。
 - **runaway 页定性：循环退化（repetition loop）实锤，非真密排**（n-gram 检测：去空白 1755 字符中单字"日"循环占 ~80%（top-10-gram "日"×10 出现 1405 次、top-40-gram 出现 1375 次，阈值 ≥3 次判 loop），tail 全为"日"）。形态：5.png 为《欽定四庫全書簡明目錄》目录页，前 9 个 BLOCK（书名/卷次/部类）识别正常，最后一个窄长条 BLOCK（bbox [116,101,149,445]，宽仅 33px 的版心边栏字次列）内容自"欠巳"后陷入"日\n日\n…"单字循环直至上限。
 - **归因闭环（base 重跑实验，2026-10-28）**：同页 `crop_mode=False`（base，不切片）→ **tokens=204，finish=stop** 自然收尾，前 9 块与 gundam 版一致，窄列识别出"欠/日/軍/金/書/月/录/目/錄"单字序列（含简体"录"，简繁混排为模型输出风格）——**循环确认为 gundam 窄条切片特有**（切片放大插值致字形糊化 → 单字连锁误判），base 整页缩放可保字形；该页 base 产物可用且仅 ~17s。loop 全扫工具（top-1 字符占比 >50%）对 10 页仅命中 5.png（81%），其余 3~8% 均健康，判据有效。
-- **v3 救援逻辑**（`scripts/batch_pages_eval.py` 已升级，离线三分支验证通过）：gundam finish=length 且脚本内自动判定 top1 字符占比 >50% → 降级 base 重跑救援（产物同路径覆盖，rec 标记 loop/rescued，状态行 `ok(base,rescued)`，summary 增 `loop_flagged`/`length_rescued`）；非 loop 截断（真密排页）保留 gundam 结果进人工复核不浪费重跑；gundam 已有结果时 base 重试失败不覆盖。代价：救援页多花一次 base 重跑（~17s/页），吞吐不省但质量救回。
+- **v3 救援逻辑**（`scripts/batch_pages_eval.py` 已升级，离线三分支验证通过）：gundam finish=length 且脚本内自动判定 top1 字符占比 >50% → 降级 base 重跑救援（产物同路径覆盖，rec 标记 loop/rescued，状态行 `ok(base,rescued)`，summary 增 `loop_flagged`/`length_rescued`）；非 loop 截断（真密排页）保留 gundam 结果进人工复核不浪费重跑；gundam 已有结果时 base 重试失败不覆盖。代价：救援页多花一次 base 重跑（~17s/页），吞吐不省但质量救回。**实战验证（第三轮 v3 全程）**：5.png 按设计触发 `ok(base,rescued)`，wall=282.96s（gundam 封顶 ~262s + base ~21s），tokens=204/finish=stop，产物覆盖为 base 版；summary `loop_flagged=1`/`length_rescued=1`，avg_tokens 回落至真实文本量 178.9（此前被 3000 循环垃圾拉偏至 458.5）。
 - **吞吐敏感性**：1 页 runaway ≈ 16 个正常页耗时；runaway 率 5% 时整批吞吐降至 ~125 页/时。处置：3000 上限封顶防拖死 + v3 自动 base 救援（质量口径），不因个别页调大上限、不加 repetition penalty（temperature=0 为评测口径）。
-- **summary 口径警示**：断点续跑轮 `pages_per_hour_this_run=61.7` 被续跑分母（6 页）+ runaway 双重拉偏；单次全程复跑轮 89.0（elapsed 404.5s 含加载，分母 10 页一致）为"含 runaway 整批口径"。两轮正常页均值 15.95~16.3s/页 ≈ **221~226 页/时**（偏差 <2%，口径稳定），汇报用此口径。
+- **summary 口径警示**：断点续跑轮 `pages_per_hour_this_run=61.7` 被续跑分母（6 页）+ runaway 双重拉偏；单次全程轮 89.0（elapsed 404.5s 含加载）、v3 轮 83.0（433.5s 含加载 + 救援多跑一次）均为"含 runaway 整批口径"。三轮正常页均值 15.95~16.72s/页 ≈ **215~226 页/时**（口径稳定），汇报用中值 ~16.3s/页 ≈ 221 页/时。
 - 100 页验收放大：book01 仅 10 页，需指定更大图片目录复用脚本（`python scripts/batch_pages_eval.py 100 <img_dir>`），脚本与断点逻辑不变。

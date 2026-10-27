@@ -437,3 +437,19 @@ Work Log:
 Stage Summary:
 - 5.png 案件完整闭环：现象→定性（loop）→归因（gundam 窄条切片）→自动化处置（v3 救援）→判据入库
 - 剩余悬挂：EOS 页尾真值核查、更大图片目录 100 页放大（用 v3）
+
+---
+Task ID: 23
+Agent: main (Z.ai)
+Task: v3 实战验证收官（用户第三轮全程复跑）——book01 批量首测全面闭环
+
+Work Log:
+- v3 实战验证通过：5.png 按设计触发 ok(base,rescued)，wall=282.96s（gundam 封顶 ~262s + base ~21s），tokens=204/finish=stop，产物覆盖为 base 版；summary loop_flagged=1 / length_rescued=1 计数正确
+- book01 收官数据：finish_stop=10/10、finish_length=0——batch 产物层面无截断/垃圾页；avg_tokens 回落至真实文本量 178.9（此前被 3000 循环垃圾拉偏至 458.5）
+- 三轮复现定稿：9 个正常页逐页 token 数三轮一致（172/211/162/87/175/188/198/215/177），temperature=0 确定性三连证；正常页均值 15.95/16.31/16.72 s/页（三轮）→ 汇报口径定稿 ~16.3s/页 ≈ 221 页/时
+- 文档收官：env-compat-eval.md §9 成功率/正常页口径/口径警示三条更新（三轮数据）；deployment.md §4 实测行改三轮收官表述
+- 遗留指引已交付：EOS 页尾核查（10 页 result.md 尾行对照原图命令）；100 页放大（v3 断点续跑 + 救援逻辑原样复用）
+
+Stage Summary:
+- book01 批量首测完整闭环：现象→防护→定性→归因→自动化处置→实战验证，全链路入库（本轮推送后）
+- 16G 卡 5080 基线最终口径：正常页 ~16.3s/页 ≈ 221 页/时；runaway 页封顶 + 自动救援；剩余悬挂仅 EOS 真值核查与 100 页放大
