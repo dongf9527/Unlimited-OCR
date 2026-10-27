@@ -462,11 +462,14 @@ def check_route_b(rep, route):
 def check_flash_attn(rep, route):
     fv, _ = dist_version(rep, "flash-attn")
     if fv:
-        rep.add(PASS, "flash-attn", f"flash-attn {fv}（注意力加速可用）")
+        rep.add(PASS, "flash-attn",
+                f"flash-attn {fv}（已装；本模型 use_mla=false 走 mha_eager，主路径不可达，无实际加速）")
     else:
         rep.add(INFO, "flash-attn",
-                "未安装 flash-attn：模型自动回退 SDPA/eager，路线 A 可跑但吞吐下降",
-                "如需安装请匹配 torch+cu128 对应轮子")
+                "未安装 flash-attn（正常状态，无需安装）：本模型 use_mla=false，解码固定 mha_eager（SR-SWA），"
+                "ATTENTION_CLASSES 无 mha_flash_attention_2 键；视觉侧 use_flash_attn=False 源码硬编码，"
+                "其 True 分支亦为 torch 原生 SDPA——装与不装对吞吐与结果均无影响",
+                "勿向 from_pretrained 传 attn_implementation=\"flash_attention_2\"（KeyError 崩溃）")
 
 
 # ---------------------------------------------------------------- 路线结论
