@@ -159,3 +159,17 @@ Stage Summary:
 - 新仓库现含：上游 GitHub 快照（根级）+ HF 建模源码（hf-model-code/）+ 自有 docs/、scripts/
 - 二开可开箱：权重文件放入 hf-model-code/ 即构成完整本地模型仓库（trust_remote_code 直改直用）
 - token 有效期至约 2026-11-26
+
+---
+Task ID: 9
+Agent: main (Z.ai)
+Task: 沙箱与 GitHub 对齐 + PRD + 部署文档
+
+Work Log:
+- 对齐检查：HEAD 与远程一致（b242ecd）；发现 rsync 引入的 48 个文件权限位漂移（644→755），统一恢复 644，工作树干净
+- 新增 docs/prd/pdf-ocr-prd.md（PRD v1.0）：范围界定（明确砍掉 Web 界面/训练/分布式/复杂水印）、六步管线架构、6 组功能需求（含 JSON schema）、精确依赖版本表（Python 3.10/torch 2.13.0/transformers 4.52.1 等）、双推理路线选型、里程碑与风险；中文 2009 字
+- 新增 docs/prd/deployment.md：路线 A/B 完整部署命令（含 SGLang 全参数启动、环境变量、健康检查）、Python/curl 客户端代码、参数调优速查表、验收清单
+- docs/README.md 索引同步；提交并推送
+
+Stage Summary:
+- 远程同步于本批提交；PRD 与部署文档配套，第三人可按文档独立复现部署
