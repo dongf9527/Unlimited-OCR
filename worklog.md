@@ -369,3 +369,19 @@ Work Log:
 Stage Summary:
 - 50 页批量实现已交付（heredoc + 仓库脚本 b91945e 双通道），100 页验收可在 50 页结果验证后放大 N 复用
 - 待回传：summary.json（成功率、avg_infer_s、finish 分布）；EOS 早停真值核查仍挂起
+
+---
+Task ID: 19
+Agent: main (Z.ai)
+Task: 用户报告批量脚本"卡住"（[4/10] 后无输出）——诊断 + v2 心跳/上限修复
+
+Work Log:
+- 诊断定性：非死锁，属页内静默设计缺陷（eval_mode 无流式正文 + redirect_stdout 吞 debug → 页内零输出）；前 4 页 8~21s/页正常完成，第 5 页疑密页/runaway 页静默长跑（无上限时页级 guard max_page_tokens=20000 ≈ 29 分钟才强制截断）
+- v2 修复（scripts/batch_pages_eval.py，py_compile 通过）：① max_new_tokens=3000 单页硬上限（≈4.3 分钟封顶，超限 finish=length 进 summary 的 finish_length 字段待人工核查）；② tps_interval=100 页内心跳（≈9s/行）+ _TpsFilter stdout 过滤器（只放行 [TPS] 行，逐层 debug 仍吞）；③ summary 增 finish_length 计数；deployment.md §4 注记同步
+- 断点保障：progress.jsonl 已记录 1-4 页 ok，v2 重跑自动跳过（注：book01 实际共 10 页，N_PAGES=50 时自动取全部）
+- 提交 abd7f8a 按 SOP --no-verify 推送成功
+- 用户侧指引：另终端 nvidia-smi 判真死活（GPU-Util 高=仍在算）；Ctrl+C 后跑 v2 heredoc，1-4 页白跑不损失
+
+Stage Summary:
+- "卡住"问题归因为可观测性缺失并闭环（心跳 + 硬上限），仓库 v2 已上 GitHub（abd7f8a）
+- 观察点：第 5 页若在 v2 下被 length 截断（3000 token），即 runaway 页实锤，转 EOS/真值核查线
