@@ -484,3 +484,19 @@ Work Log:
 Stage Summary:
 - book01 十页质量侧全部闭环：EOS 无早停（接缝终验）、页码块 2 处定点误识（辅助块已知问题）、窄条循环两案例（重 5.png/轻 4.png）、字准候选 3 处（待办不阻塞）
 - 至此唯一剩余：更大图片目录的 100 页验收放大
+
+---
+Task ID: 26
+Agent: main (Z.ai)
+Task: 对齐沙箱与 github + max_new_tokens 3000→1500 下调 + heredoc 全量版收敛为仓库脚本正本
+
+Work Log:
+- 对齐验证：git fetch 后本地 HEAD 与 origin/main 同为 a23fa78、工作树干净——沙箱与 github 已一致（用户侧如仍用 heredoc 粘贴通道，此后改为 git pull 即可）
+- 上限下调（用户指定）：scripts/batch_pages_eval.py MAX_NEW_TOKENS 3000→1500（py_compile + AST 断言通过）；注释更新封顶口径 4.3→2.2 分钟并记录下调理由（loop 页 gundam 产物仅为 base 救援中间态，封顶减半即救援页 wall 283s→~150s；正常页 87~215 token 余量 ~7 倍）
+- 口径重算（1500 上限下）：runaway 页 ~153s（gundam ~132s + base ~21s），runaway 率 5% 时整批吞吐 ~125→~155 页/时（改善 ~24%）
+- 文档同步：deployment.md §4（上限规格 + 实测句加"当时"标注与 1500 换算）、§6 基线（封顶 264.8s 加 1500 对应 ≈132s）；env-compat-eval.md §9（封顶行为条加"3000 时期实测"注记；吞吐敏感性条重写为 1500 处置口径）；历史实测数值一律保留原值不篡改
+- heredoc 收敛说明：仓库 scripts/batch_pages_eval.py（v3 全量版）即唯一正本，deployment.md §4 用法入口已指向该脚本；本轮推送后用户侧以 git pull 取脚本，不再走 heredoc 粘贴
+
+Stage Summary:
+- 1500 上限随 v3 救援逻辑无代码改动（finish=length 触发条件不变），100 页放大直接受益：最坏页耗时近乎减半
+- 推送内容：scripts/batch_pages_eval.py + docs/prd 两处口径 + 本 worklog

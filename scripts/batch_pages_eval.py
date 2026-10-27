@@ -35,7 +35,9 @@ IMG_DIR = os.path.expanduser(sys.argv[2] if len(sys.argv) > 2
 N_PAGES = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 OUT_DIR = "out/batch50"                       # 相对 cwd，与 out/single 同级
 PROGRESS = os.path.join(OUT_DIR, "progress.jsonl")
-MAX_NEW_TOKENS = 3000                         # 单页硬上限：3000/11.5 t/s ≈ 4.3 分钟封顶，超限 finish=length
+MAX_NEW_TOKENS = 1500                         # 单页硬上限：1500/11.5 t/s ≈ 2.2 分钟封顶，超限 finish=length
+                                              # （2026-10-28 自 3000 下调：loop 页 gundam 产物仅为 base 救援中间态，
+                                              #   封顶减半即救援页整页 wall 283s→~150s；正常页 87~215 token 余量 ~7 倍）
 TPS_EVERY = 100                               # 页内心跳：每 100 token 一行 [TPS]（≈9s）
 
 
