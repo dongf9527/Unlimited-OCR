@@ -1,6 +1,6 @@
 # GitHub 协作规则
 
-> 版本：v1.0 ｜ 生效日期：2026-10-27 ｜ 适用范围：本沙箱内所有代码与文档的协作、提交与推送行为
+> 版本：v1.1 ｜ 生效日期：2026-10-27 ｜ 适用范围：本沙箱内所有代码与文档的协作、提交与推送行为
 
 ## 一、规则总览
 
@@ -22,7 +22,24 @@
 
 ### 规则 2 ｜ 仓库位置
 
-仓库根目录固定为沙箱根目录 `/home/z/my-project/`，该目录已初始化为 git 仓库（分支 `main`）。不得在沙箱内其他位置执行 `git init` 或创建 `.git` 目录，避免多仓库并存导致改动散落、状态漂移。当前唯一例外是 `research/Unlimited-OCR/` 内由上游克隆带来的嵌套 `.git`，它属于只读调研资料；推送前会将其列入 `.gitignore` 或以子模块方式处理，确保主仓库推送内容干净。
+沙箱内唯一 git 仓库的**准确绝对路径**为：
+
+```text
+/home/z/my-project/
+```
+
+该目录已初始化为 git 仓库（分支 `main`），远程为 `origin = https://github.com/dongf9527/Unlimited-OCR.git`。不得在沙箱内其他位置（如 `/home/z/`、`/tmp/`、任何子目录）执行 `git init` 或创建 `.git` 目录，避免多仓库并存导致改动散落、状态漂移。
+
+仓库内固定目录职责（2026-10-27 调整）：
+
+| 路径 | 职责 |
+| --- | --- |
+| `/home/z/my-project/docs/` | 全部文档沉淀：分析报告（md/docx）、图表（charts/）、目录索引与协作规则 |
+| `/home/z/my-project/scripts/` | 生成脚本（Python / Node），可迭代复用 |
+| `/home/z/my-project/.credentials/` | git 凭证存储（gitignored，权限 700/600，绝不提交） |
+| `/home/z/my-project/worklog.md` | 多智能体共享工作日志 |
+
+历史说明：早期交付物存放在 `download/`，已于 2026-10-27 全部迁移至 `docs/`；此后新生成的报告类交付物直接写入 `docs/` 并提交推送。
 
 ### 规则 3 ｜ 提交规范
 
@@ -64,10 +81,16 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | 远程 remote | `https://github.com/dongf9527/Unlimited-OCR.git`（origin，已配置） |
 | 首次推送 | 2026-10-27 完成，`main` → `origin/main`（d2ae0c1），已建立上游跟踪 |
 | 推送前清洗 | `.env`（含 DATABASE_URL）已从全部历史移除并加入 `.gitignore`；`research/`、`tool-results/` 已移出索引并忽略 |
-| `docs/` 目录 | 已创建，本文件为首个沉淀文档（对应规则 4） |
+| `docs/` 目录 | 全部文档沉淀处：报告 md/docx、charts/ 图表、README 索引及本规则文件（对应规则 4） |
+| 目录迁移 | 2026-10-27 将 `download/` 下全部文档与图表迁移至 `docs/`，此后报告类交付物直接写入 `docs/` |
+| 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，待使用者重新提供 token 后写入） |
 
-## 四、凭证安全约定
+## 四、凭证安全约定（v1.1 更新：持久化存储）
 
-- 访问 token 仅在单次推送中通过一次性 `Authorization` 请求头注入，**不写入** `.git/config`、`credentials` 文件或任何提交内容；
-- token 在对话中出现即视为已暴露，建议使用者定期在 GitHub Settings → Developer settings 中轮换 fine-grained PAT，并保持最小授权（仅目标仓库 Contents: Read/Write）；
-- 远程 URL 始终保持不含凭证的干净形式，避免 token 随仓库配置泄漏。
+经使用者明确授权，访问 token 由沙箱妥善保存，供 30 天有效期内反复使用：
+
+- **存储位置**：`/home/z/my-project/.credentials/github-token`（纯文本仅存 token 本体）；目录权限 `700`、文件权限 `600`，仅沙箱内 git 推送/拉取流程可读；
+- **绝不入库**：`.credentials/` 已加入 `.gitignore`（已验证生效），token **不写入** `.git/config`、remote URL、任何脚本或提交内容；
+- **使用方式**：推送/拉取时以临时 credential helper 或一次性 `Authorization` 请求头从该文件读取注入，用后不残留于进程参数或日志；
+- **有效期管理**：token 有效期 30 天（自 2026-10-27 起算，约 2026-11-26 到期），到期前提醒使用者轮换；建议定期在 GitHub Settings → Developer settings 中轮换 fine-grained PAT，并保持最小授权（仅目标仓库 Contents: Read/Write）；
+- **远程 URL 干净原则**：`origin` 始终保持不含凭证的干净形式，避免 token 随仓库配置泄漏。
