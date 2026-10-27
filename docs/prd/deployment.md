@@ -16,18 +16,18 @@ v1.0（SGLang 双路线、uv 管理）已归档：`docs/archive/deployment-v1.0.
 环境自检（装完环境后运行，无 FAIL 再进冒烟；版本适配分析见 `env-compat-eval.md`）：
 
 ```bash
-python scripts/check_env.py --route A --model-dir /data/models/Unlimited-OCR-2
+python scripts/check_env.py --route A --model-dir ~/sourcecode/Unlimited-OCR/models/Unlimited-OCR
 # CI/批量场景用 --json 取机器可读结果
 ```
 
 权重下载（一次，离线分发到内网机器）：
 
 ```bash
-hf download baidu/Unlimited-OCR-2 --local-dir /data/models/Unlimited-OCR-2
+hf download baidu/Unlimited-OCR-2 --local-dir ~/sourcecode/Unlimited-OCR/models/Unlimited-OCR
 # 或 huggingface-cli download（hub 0.36.0 均可用）
 ```
 
-> **路径约定**：本文档以 `/data/models/Unlimited-OCR-2` 为示例路径，可整体替换为实际权重目录（如 `~/sourcecode/Unlimited-OCR/data/models/Unlimited-OCR`），但三处必须保持一致：§1 自检的 `--model-dir`、§3 冒烟的 `name`、§4 批量客户端的 `MODEL`。权重目录放进仓库克隆内不受影响（check_env 支持 `~/` 与 `~user/` 展开，加引号亦可），但必须位于 `.gitignore` 排除的 `data/` 之下，严防 6.6GB 分片被提交（仓库未对 safetensors 配 LFS）。
+> **路径约定（定稿）**：权重目录统一为 `~/sourcecode/Unlimited-OCR/models/Unlimited-OCR`，全文档四处路径（下载 `--local-dir`、自检 `--model-dir`、冒烟 `name`、批量客户端 `MODEL`）均已按此写死，换机时整体替换即可。Shell 参数可直接写 `~/...`（check_env 自动展开，加引号亦可）；**Python 代码内 `~` 不会自动展开**，必须如本文档用 `os.path.expanduser()`。`models/` 与 `*.safetensors` 已在 `.gitignore` 排除，严防 6.6GB 分片被提交（仓库未对 safetensors 配 LFS）；`data/` 已移出排除，可正常存放需纳管的样本数据，注意体积即可。
 
 ## 2. 环境部署（conda）
 
@@ -68,9 +68,10 @@ pip install flash-attn --no-build-isolation
 
 ```bash
 python - <<'PY'
+import os
 import torch
 from transformers import AutoModel, AutoTokenizer
-name = "/data/models/Unlimited-OCR-2"
+name = os.path.expanduser("~/sourcecode/Unlimited-OCR/models/Unlimited-OCR")
 tok = AutoTokenizer.from_pretrained(name, trust_remote_code=True)
 model = AutoModel.from_pretrained(name, trust_remote_code=True,
         use_safetensors=True, torch_dtype=torch.bfloat16).eval().cuda()
@@ -84,9 +85,10 @@ PY
 
 ```bash
 python - <<'PY'
+import os
 import torch
 from transformers import AutoModel, AutoTokenizer
-name = "/data/models/Unlimited-OCR-2"
+name = os.path.expanduser("~/sourcecode/Unlimited-OCR/models/Unlimited-OCR")
 tok = AutoTokenizer.from_pretrained(name, trust_remote_code=True)
 model = AutoModel.from_pretrained(name, trust_remote_code=True,
         use_safetensors=True, torch_dtype=torch.bfloat16).eval().cuda()
@@ -102,13 +104,13 @@ PY
 生产批处理骨架（渲染、分批、断点判断均可直接复用进管线 M2）：
 
 ```python
-import json, tempfile
+import json, os, tempfile
 from pathlib import Path
 import fitz
 from transformers import AutoModel, AutoTokenizer
 import torch
 
-MODEL = "/data/models/Unlimited-OCR-2"
+MODEL = os.path.expanduser("~/sourcecode/Unlimited-OCR/models/Unlimited-OCR")
 BATCH_PAGES = 10            # 显存受限降批：10 -> 5 -> 1
 DPI = 300                   # OOM 降档：300 -> 200
 

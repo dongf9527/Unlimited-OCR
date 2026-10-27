@@ -33,6 +33,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# 模型权重统一放 data/（6.6GB 分片禁止入库，未配 LFS，push 会被 100MB 限制拒绝）
-data/
+# 模型权重定稿路径 models/（6.6GB 分片禁止入库，未配 LFS）；data/ 已按需求移出排除，放行内容注意体积
+models/
 *.safetensors

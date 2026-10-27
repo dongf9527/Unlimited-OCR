@@ -239,3 +239,16 @@ Work Log:
 
 Stage Summary:
 - 远程同步于本批提交；用户可放心使用其路径，唯一硬要求是权重放 data/ 下且全文档三处路径一致
+
+---
+Task ID: 14
+Agent: main (Z.ai)
+Task: 权重路径定稿 ~/sourcecode/Unlimited-OCR/models/Unlimited-OCR + data/ 移出 gitignore
+
+Work Log:
+- .gitignore：移除 data/（按需求放行，含提示注释）；新增 models/ 排除（定稿权重位置）；*.safetensors 全局兜底保留；check-ignore 三案例验证（models/ 拦截、data/probe.txt 放行、data/ 内游离 safetensors 仍拦截）
+- deployment.md 六处路径联动定稿：下载 --local-dir、自检 --model-dir、单页/多页冒烟 name、批量客户端 MODEL；Python 代码内 ~ 不自动展开，统一改用 os.path.expanduser()（补 import os）；路径约定块改写为定稿说明
+- 全仓 grep 确认 docs/prd 与 scripts 无 /data/models 残留；归档文档保留旧路径（历史快照不动）
+
+Stage Summary:
+- 远程同步于本批提交；权重路径定稿 + data/ 放行均已落地，防护重心移至 models/ 与 *.safetensors 双规则
