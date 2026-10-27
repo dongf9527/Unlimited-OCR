@@ -70,7 +70,7 @@ pip install flash-attn --no-build-isolation
 
 ## 3. 冒烟测试
 
-单页（gundam 模式）：
+单页（gundam 模式；`return_dict=True` 时返回含 `text` / `token_ids` / `prompt` 的 dict）：
 
 ```bash
 python - <<'PY'
@@ -81,13 +81,15 @@ name = os.path.expanduser("~/sourcecode/Unlimited-OCR/models/Unlimited-OCR")
 tok = AutoTokenizer.from_pretrained(name, trust_remote_code=True)
 model = AutoModel.from_pretrained(name, trust_remote_code=True,
         use_safetensors=True, torch_dtype=torch.bfloat16).eval().cuda()
-text, n = model.infer(tok, image_file="page_1.jpg",
-                      output_path="out/single", save_results=True)
-print(text[:200], "| tokens:", n)
+res = model.infer(tok, image_file="page_1.jpg",
+                  output_path="out/single", save_results=True, return_dict=True)
+print(res["text"][:200], "| tokens:", len(res["token_ids"]))
 PY
 ```
 
-多页（整本一次请求，prompt 由模型侧自动构造为 `"<PAGE><image>"*n + "Multi page parsing."`）：
+> **返回值契约（实测 2026-10-28 修正）**：`infer()` 默认直接返回**纯字符串**，非 dict 模式不存在 `(text, n)` 元组形态——勿按 2 元组解包（会报 `too many values to unpack`）。`infer()` 本身即单/多页统一入口（`image_file` 传 list 即多页；`crop_mode=None` 自动选路：单页 gundam 切片、多页 base）；`infer_multi(image_files=[...])` 是强制 base 模式的兼容包装，固定返回 `(text, n_tokens)` 2 元组。
+
+多页（整本一次请求，prompt 由模型侧自动构造为 `"<PAGE><image>"*n + "Multi page parsing."`；`infer_multi` 固定返回 `(text, n_tokens)` 2 元组）：
 
 ```bash
 python - <<'PY'

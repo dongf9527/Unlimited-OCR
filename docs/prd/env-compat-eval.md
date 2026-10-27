@@ -60,3 +60,9 @@
 按 `deployment.md` §2 三步安装全部成功，与 §1 定稿基线逐项一致：torch 2.11.0+cu128 / torchvision 0.26.0+cu128（官方配对）；transformers 4.52.1 + tokenizers 0.21.4 + huggingface-hub 0.36.0 成组落位（torchvision 附带拉入的 pillow 12.3.0 被第二步正确压回 11.0.0，印证"成组安装"设计的必要性）；addict 2.4.0 / einops 0.8.2 / easydict 1.13 / pymupdf 1.27.2.2 / opencv-python-headless 5.0.0.93 / python-docx 1.2.0 全部精确命中；reportlab 5.1.0 满足 ≥4.0。传递依赖 numpy 2.2.6、safetensors 0.8.0 均落在 transformers 4.52.1 声明区间（numpy≥1.17、safetensors≥0.4.3），随冒烟一并观察即可。锁定文件 requirements-lock.txt 与 uocr-lock.yml 已生成，具备异机复现条件。
 
 可选加速步 `pip install flash-attn --no-build-isolation` 在 metadata 阶段失败（`ModuleNotFoundError: No module named 'psutil'`，根因：`--no-build-isolation` 跳过构建依赖后，flash-attn setup.py 的自定义 build_ext 无法 import psutil）。结合对 `hf-model-code/` 的静态检查：config.json `use_mla=false` → 解码固定 `mha_eager`（SR-SWA）；`ATTENTION_CLASSES` 无 `mha_flash_attention_2` 键（上游注释掉）；视觉侧 `use_flash_attn=False` 硬编码且其 True 分支亦为 torch 原生 SDPA——**flash-attn 对本模型主路径不可达，该失败无需修复，跳过即可**。`deployment.md` §2/§6 与 `scripts/check_env.py` 的 flash-attn 判定文案已按此结论修正（原"未装则吞吐下降"表述作废）。
+
+## 6. 冒烟回归（2026-10-28，RTX 5080 / sm_120 / 驱动 621.01）
+
+`check_env.py --route A` 全绿后单页冒烟一次通过：trust_remote_code 加载 + bf16 推理全链路正常，DASH block-sparse 稀疏注意力（Triton JIT，`_POSIX_C_SOURCE redefined` 为无害编译警告）正常激活，S=1519（image tokens 1513，gundam 单页切片），输出结构化版面块（header / page_number / text + bbox + `<FORK>` 内容）与上游 schema 一致，`save_results` 产物正常落盘。至此 v1.1 定稿矩阵在 Blackwell 消费级卡上完成端到端验证。
+
+同轮发现并修正文档契约 bug：`deployment.md` §3 单页示例原按 `(text, n)` 2 元组解包 `infer()` 返回值，实际 `infer()` 默认返回纯字符串（`return_dict=True` 时返回 `text` / `token_ids` / `prompt` 的 dict），仅 `infer_multi()` 固定返回 2 元组（且其为 `infer(crop_mode=False, return_dict=True)` 的兼容包装；`infer()` 本身即单/多页统一入口）。§3 示例已改为 `return_dict=True` 取值并补注返回值契约。待补实测：单页耗时 / TPS（`infer(..., tps_interval=1)`）与 100 页批量吞吐（16G 卡 `BATCH_PAGES=1` 顺序）。
