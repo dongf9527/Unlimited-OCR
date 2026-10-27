@@ -319,3 +319,20 @@ Stage Summary:
 - 结论：tps_interval 默认 0=静默；测速读 res['time']/res['prefill_time']，勿用 tps_interval=1
 - 用户侧修正命令已交付（去 tps_interval 或改 50；全静默 eval_mode=True）
 - 文档修正已上 GitHub（b6f55a2）
+
+---
+Task ID: 16
+Agent: main (Z.ai)
+Task: 用户按修正命令复跑成功——实测数据解读并固化为 RTX 5080 基线
+
+Work Log:
+- 用户实测回传：tokens=211, prefill=6.00s, total=24.37s, decode_TPS=11.5 t/s，刷屏消除，与首轮逐 token 流式观测（~11.3 t/s）交叉印证一致；结果与首轮逐字符一致（temperature=0 确定性）
+- 解读三点：冷启动 prefill 含 DASH Triton JIT（解码前几步 ~5.5 t/s 爬升）；res['time'] 起于 _uocr_generate 不含图片预处理；流式打印开销含在 decode TPS 内（基准建议 eval_mode=True）
+- 质量观察：211 token 自然 EOS 止于"…者可"半句 + 页码块误识"リョ"，是否早停待对照真值
+- 文档固化：env-compat-eval.md 新增 §8 单页实测（148 页/时，16G 卡功能验证定位）；deployment.md §6 表后补 RTX 5080 实测基线注记
+- 提交 0d48c10 并按 SOP --no-verify 推送成功，本地 = origin/main
+- 已交付同进程双跑热稳态基准命令（eval_mode=True + finish_reason 输出 + save_results=False），热稳态数据待用户回传
+
+Stage Summary:
+- RTX 5080 冷启动基线已上 GitHub（0d48c10）：~24s/页 ≈ 148 页/时，符合 16G 卡定位
+- 待补：热稳态双跑数据、100 页批量吞吐（BATCH_PAGES=1）
