@@ -2,7 +2,8 @@
 """页级批量评测（16G 卡顺序单页路线，deployment.md §4 约定的图片源变体）。
 
 逐页单请求（等价 BATCH_PAGES=1，勿用 infer_multi 整本模式——16G 会 OOM），
-支持 progress.jsonl 断点续跑、单页失败 gundam→base 各重试一次、summary.json 汇总。
+支持 progress.jsonl 断点续跑、单页失败 gundam→base 各重试一次、summary.json 汇总；
+页内 [TPS] 心跳（每 100 token 一行，约 9s）+ max_new_tokens 硬上限防 runaway 页拖死整批。
 测速口径见 env-compat-eval.md §7/§8（infer_s 不含图片预处理；wall_s 为端到端）。
 
 用法:
@@ -30,6 +31,8 @@ IMG_DIR = os.path.expanduser(sys.argv[2] if len(sys.argv) > 2
 N_PAGES = int(sys.argv[1]) if len(sys.argv) > 1 else 50
 OUT_DIR = "out/batch50"                       # 相对 cwd，与 out/single 同级
 PROGRESS = os.path.join(OUT_DIR, "progress.jsonl")
+MAX_NEW_TOKENS = 3000                         # 单页硬上限：3000/11.5 t/s ≈ 4.3 分钟封顶，超限 finish=length
+TPS_EVERY = 100                               # 页内心跳：每 100 token 一行 [TPS]（≈9s）
 
 
 def page_key(p):
@@ -56,7 +59,15 @@ tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 model = AutoModel.from_pretrained(MODEL, trust_remote_code=True,
                                   use_safetensors=True, torch_dtype=torch.bfloat16).eval().cuda()
 
-sink = io.StringIO()
+class _TpsFilter(io.StringIO):
+    """stdout 过滤器：只放行 [TPS] 心跳行，逐层 debug 打印仍吞掉"""
+    def write(self, s):
+        if "[TPS]" in s:
+            sys.__stdout__.write(s)
+        return len(s)
+
+
+sink = _TpsFilter()
 t_all = time.time()
 for i, img in enumerate(todo, 1):
     name = os.path.basename(img)
@@ -68,8 +79,8 @@ for i, img in enumerate(todo, 1):
             with contextlib.redirect_stdout(sink):                # 吞掉模型逐层 debug 打印
                 res = model.infer(tok, image_file=img,
                                   output_path=os.path.join(OUT_DIR, "pages", stem),
-                                  save_results=True, return_dict=True,
-                                  eval_mode=True, **kw)
+                                  save_results=True, return_dict=True, eval_mode=True,
+                                  max_new_tokens=MAX_NEW_TOKENS, tps_interval=TPS_EVERY, **kw)
             rec.update(ok=True, mode=("gundam" if attempt == 0 else "base"),
                        tokens=len(res["token_ids"]), finish=res["finish_reason"],
                        infer_s=round(res["time"], 2),
@@ -97,6 +108,7 @@ stats = {
     "avg_infer_s": round(sum(r["infer_s"] for r in ok) / max(len(ok), 1), 2),
     "avg_tokens": round(sum(r["tokens"] for r in ok) / max(len(ok), 1), 1),
     "finish_stop": sum(1 for r in ok if r["finish"] == "stop"),
+    "finish_length": sum(1 for r in ok if r["finish"] == "length"),
     "base_fallback_used": sum(1 for r in ok if r["mode"] == "base"),
     "pages_per_hour_this_run": round(len(todo) / max(time.time() - t_all, 1e-6) * 3600, 1),
     "failed": [os.path.basename(r["image"]) for r in rows if not r["ok"]],

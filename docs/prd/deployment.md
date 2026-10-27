@@ -159,7 +159,7 @@ parse_pdf("demo.pdf", "out/demo")
 
 断点续跑：每文档完成后写 `manifest.json`（含 doc_id 与产物哈希），批处理入口启动时先查 manifest，已存在则跳过该文档；单页失败重试 2 次（gundam→base 各一次）后落 `failed_pages.json` 继续，行为约定见 PRD §4.6。
 
-**快速验证（50 页量级 / 图片源）**：`scripts/batch_pages_eval.py` 按**顺序单页**逐页请求（等价 `BATCH_PAGES=1`；勿改用 `infer_multi` 整本模式，16G 必 OOM），实现 `progress.jsonl` 断点续跑（已 ok 页自动跳过、失败页重跑自动重试）、gundam→base 重试、`summary.json` 汇总（成功率/均耗时/均 token/finish 分布）。用法 `python scripts/batch_pages_eval.py [N页数] [图片目录]`，默认 50 页、`~/guwen-model-eval/data/raw/images/book01`；RTX 5080 稳态预计 17~20 分钟（首页 +6s JIT）。
+**快速验证（50 页量级 / 图片源）**：`scripts/batch_pages_eval.py` 按**顺序单页**逐页请求（等价 `BATCH_PAGES=1`；勿改用 `infer_multi` 整本模式，16G 必 OOM），实现 `progress.jsonl` 断点续跑（已 ok 页自动跳过、失败页重跑自动重试）、gundam→base 重试、`summary.json` 汇总（成功率/均耗时/均 token/finish 分布）。页内可见性：`tps_interval=100` 心跳（约 9s/行，debug 打印仍被过滤）+ `max_new_tokens=3000` 单页硬上限（≈4.3 分钟封顶，超限 `finish=length` 标记待人工核查）——防个别密页/runaway 页让整批"看似假死"。用法 `python scripts/batch_pages_eval.py [N页数] [图片目录]`，默认 50 页、`~/guwen-model-eval/data/raw/images/book01`；RTX 5080 稳态预计 17~20 分钟（首页 +6s JIT）。
 
 ## 5. 导出层依赖与后处理
 
