@@ -98,3 +98,14 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 - **使用方式**：推送/拉取时以临时 credential helper 或一次性 `Authorization` 请求头从该文件读取注入，用后不残留于进程参数或日志；
 - **有效期管理**：token 有效期 30 天（自 2026-10-27 起算，约 2026-11-26 到期），到期前提醒使用者轮换；建议定期在 GitHub Settings → Developer settings 中轮换 fine-grained PAT，并保持最小授权（仅目标仓库 Contents: Read/Write）；
 - **远程 URL 干净原则**：`origin` 始终保持不含凭证的干净形式，避免 token 随仓库配置泄漏。
+
+## 五、沙箱环境风险与防御（v1.1 补充，2026-10-27）
+
+沙箱会在会话之间清理**未被 git 跟踪**的内容（含 gitignored 目录与仓库外路径），已发生两次实际损失，防御约定如下：
+
+| 已发生事故 | 后果 | 防御措施 |
+| --- | --- | --- |
+| `.credentials/` 凭证目录被清理 | 推送时才发现 token 失效 | 每次会话开始先做 token 健康检查（`GET /user` 返回 200 才开工）；token 丢失时向使用者索要 |
+| `~/.gitconfig` 与 `/home/z/.local/`（git-lfs 二进制）被清理 | 自动快照提交把 156MB gif 按普通 blob 提交，触发 GitHub 100MB 拒收 | LFS filter 同时写入 `~/.gitconfig` 与仓库本地 `.git/config`（后者随 `.git` 持久存活）；git-lfs 二进制丢失需重装至 `/home/z/.local/`（脚本见 worklog Task 10） |
+
+另外约定：沙箱自动快照会在会话间生成 UUID 命名的系统提交，若其内容异常（如绕过 LFS 的大文件），在**未推送**前提下允许 reset 重写本地历史予以修正；已推送历史仍按规则 5 处理。

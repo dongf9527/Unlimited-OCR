@@ -173,3 +173,21 @@ Work Log:
 
 Stage Summary:
 - 远程同步于本批提交；PRD 与部署文档配套，第三人可按文档独立复现部署
+
+---
+Task ID: 10
+Agent: main (Z.ai)
+Task: token 重存 + 推送被拒事故修复（沙箱清理连锁反应）
+
+Work Log:
+- 发现沙箱清理了 .credentials/、research/、~/.gitconfig、/home/z/.local/（git-lfs）等所有未跟踪内容
+- 重建 .credentials/（700/600）+ gitignore 复验；API 验证 token 有效（HTTP 200, login: dongf9527）
+- 重装 git-lfs 3.7.0 至 /home/z/.local/ 并重建 filter（global + local 双写）
+- 推送遭 pre-receive 拒绝：系统自动快照提交 df3df5a 在 filter 失效期把 156MB gif 按普通 blob 入库
+- 修复（未推送历史，符合规则 5）：mixed reset 至 b242ecd → 全局权限统一（644/755 按索引）→ 重建 2 个 docs commit → gif 经恢复的 filter 重新 add 回归指针 → 提交 utils mode 恢复
+- 规则文档新增第五章"沙箱环境风险与防御"（token 会话开始健康检查约定、filter 双写防御）
+- 推送成功：远程同步于 0097a0d
+
+Stage Summary:
+- PRD 与部署文档已上云；LFS filter 本地持久化，git-lfs 丢失时按本记录重装即可
+- 待办提醒：git-lfs 二进制在仓库外，沙箱再清理时需重装（下载 v3.7.0 + git config filter 四条）
