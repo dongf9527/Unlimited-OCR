@@ -91,3 +91,21 @@ Work Log:
 Stage Summary:
 - main → origin/main 首推完成（d2ae0c1），协作规则文档随仓库上 GitHub
 - 后续所有产出按规则 1-4 走 commit + push；token 使用一次性注入方式，无需重复提供（失效时再要新的）
+
+---
+Task ID: 5
+Agent: main (Z.ai)
+Task: 沙箱凭证存储机制建立、协作规则 v1.1 更新（沙箱准确路径）、download/ 文档迁移至 docs/
+
+Work Log:
+- 确认首次推送已于上轮完成（origin/main = b0eb161，与本地一致）
+- 全盘检索确认旧 token 无任何残留（符合此前一次性使用约定，但 token 值已随上下文压缩不可恢复，需使用者重发）
+- 新建 .credentials/（目录 700、github-token 文件 600）并加入 .gitignore，git check-ignore 验证生效
+- 协作规则升级 v1.1：规则 2 写明唯一仓库准确绝对路径 /home/z/my-project/ 与各目录职责；第四章凭证约定由"一次性注入"改为"持久化存储"，含 30 天有效期管理（约 2026-11-26 到期）
+- git mv 将 download/ 全部 5 项（README、md 报告、docx 报告、charts/ 两图）迁移至 docs/，download/ 目录删除；md 报告无仓库内相对图片引用，迁移零影响
+- docs/README.md 重写为文档索引
+- 曾出现 rename 混入 chore 提交的边界问题，因三个 commit 均未推送，按规则 5 用 mixed reset 重新按干净边界提交
+
+Stage Summary:
+- 本地新增 3 个未推送 commit：eaed9f4 (chore gitignore) / c5819d8 (docs 规则 v1.1) / 3db3219 (docs 迁移)
+- 待办：使用者重新提供 token → 写入 .credentials/github-token → 立即推送
