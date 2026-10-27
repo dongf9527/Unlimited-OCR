@@ -6,3 +6,29 @@ tool-results/
 
 # git 凭证安全存储（绝不提交）
 .credentials/
+
+# --- 上游 baidu/Unlimited-OCR .gitignore 合并项（2026-10-27 同步）---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+outputs/
+log/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

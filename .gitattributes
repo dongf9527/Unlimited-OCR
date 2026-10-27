@@ -1,0 +1,4 @@
+# Upstream media tracking, adapted for this repo: only *.gif needs LFS
+# (assets/HarryPotter.gif is ~149MB, above the 100MB plain-git limit;
+#  pdf/png/whl are small enough to commit as regular blobs)
+*.gif filter=lfs diff=lfs merge=lfs -text
