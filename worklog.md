@@ -500,3 +500,19 @@ Work Log:
 Stage Summary:
 - 1500 上限随 v3 救援逻辑无代码改动（finish=length 触发条件不变），100 页放大直接受益：最坏页耗时近乎减半
 - 推送内容：scripts/batch_pages_eval.py + docs/prd 两处口径 + 本 worklog
+
+---
+Task ID: 27
+Agent: main (Z.ai)
+Task: 用户回传 1500 上限实战轮（N=100 触发 book01 自动取全）——预测命中验证入档
+
+Work Log:
+- 结果判读（用户侧两连跑）：① 首跑 done=10/todo=0 纯续跑秒出 summary（elapsed_s=0.0/pages_per_hour=0.0 属分母保护正常，统计字段从 progress.jsonl 重算有效）——断点续跑再证；② rm -r out 后 fresh 全跑（第四轮）10/10 ok、finish_stop=10/10、loop_flagged=1/length_rescued=1
+- 1500 上限核心验证：5.png 救援页 wall=148.72s（gundam 1500 封顶 ~128s [TPS 恰到 1500 avg=11.5] + base ~21s）——Task 26 预测 ~150s 命中（偏差 <1%），较 3000 上限 282.96s 降 47.4% 近乎减半；book01 含 10% runaway 整批 121.9 页/时（elapsed 295.4s，v3@3000 轮 83.0/433.5s → +46.9%/-31.9%）
+- 质量零漂移：正常 9 页 token 172/211/162/87/175/188/198/215/177 四轮逐字一致（temperature=0 确定性四连证），5.png base 救援 204 token 复现，avg_tokens=178.9 复现；正常页 wall 均值 16.29s/页（四轮 15.95/16.31/16.72/16.29，汇报口径 ~16.3s/页 ≈ 221 页/时 不变）
+- N=100 参数行为验证：book01 仅 10 页自动取全（n_target=10），100 页放大需换更大图片目录（python scripts/batch_pages_eval.py 100 <img_dir>）；换大书时建议 rm -r out 防旧进度混染（OUT_DIR 固定 out/batch50）
+- 文档入档：env-compat-eval.md §9（成功率/正常页口径改四轮，吞吐敏感性条追加实测验证句，summary 警示加纯续跑轮说明，100 页放大条补 N=100 行为）；deployment.md §4（四轮口径 + 实测 148.72s/121.9 替换估算占位）、§6（基线行同步）
+
+Stage Summary:
+- 1500 上限闭环：预测→实测命中（148.72s vs ~150s），吞吐敏感性改善兑现（整批 +46.9%），质量口径四轮零漂移
+- book01 十页侧仅剩：100 页放大待更大图片目录；字准 3 处候选待对照原图（不阻塞）
