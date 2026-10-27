@@ -142,3 +142,20 @@ Stage Summary:
 - 新仓库根级现包含上游完整快照（0cdd787），docs/、scripts/、worklog.md 共存无冲突
 - 后续增量同步：更新 research/ 克隆 → 复用 scripts/sync_upstream.sh（自动 sha256 校验）→ 提交推送
 - git-lfs 二进制位于 /home/z/.local/bin（PATH 外），相关操作前需 export PATH 或依赖绝对路径 filter
+
+---
+Task ID: 8
+Agent: main (Z.ai)
+Task: 将 HuggingFace baidu/Unlimited-OCR-2 的代码文件（除权重）同步至新仓库 hf-model-code/
+
+Work Log:
+- 验证 HF resolve 直连可达（config.json 200 OK, 0.24s）
+- scripts/sync_hf_code.sh：下载 10 个 .py 建模源码 + 5 个 JSON 配置至 hf-model-code/，逐文件 LFS 指针检测 + Python ast 语法校验 + JSON 合法性校验，全部通过，共 11MB
+- _sparse_base_impl.py 达 222KB（SR-SWA 核心，base 模式完整实现）
+- hf-model-code/README.md：来源/修订/清单/本地加载方式/二开提示
+- 提交 3e475bb（18 文件）并推送成功；docs/README.md 索引同步更新
+
+Stage Summary:
+- 新仓库现含：上游 GitHub 快照（根级）+ HF 建模源码（hf-model-code/）+ 自有 docs/、scripts/
+- 二开可开箱：权重文件放入 hf-model-code/ 即构成完整本地模型仓库（trust_remote_code 直改直用）
+- token 有效期至约 2026-11-26
