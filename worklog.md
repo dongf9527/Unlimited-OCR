@@ -420,3 +420,20 @@ Work Log:
 Stage Summary:
 - 5.png runaway 闭环：循环退化定性 + 归因假设（窄条切片）+ 可选 base 重跑实验，处置结论为维持 3000 上限不调采样参数
 - book01 全部质量/吞吐口径入库，剩余悬挂：EOS 真值核查、100 页放大验收
+
+---
+Task ID: 22
+Agent: main (Z.ai)
+Task: base 归因实验闭环 + 批量脚本 v3（loop 自动救援）交付入库
+
+Work Log:
+- 归因闭环：用户回传 5.png base 重跑（crop_mode=False）→ tokens=204 / finish=stop，前 9 块与 gundam 版一致，窄列认出"欠/日/軍/金/書/月/录/目/錄"单字序列（简繁混排）——循环确认为 gundam 窄条切片特有（放大插值字形糊化→连锁误判），base 整页缩放可保字形且仅 ~17s
+- loop 扫描验证：10 页 top1 占比仅 5.png 81% 触发判据（>50%），其余 3~8% 健康——判据有效
+- 脚本 v3（scripts/batch_pages_eval.py）：gundam finish=length 且脚本内 top1 占比 >50% → 自动降级 base 重跑救援（产物同路径覆盖，rec 标 loop/rescued，状态行 ok(base,rescued)，summary 增 loop_flagged/length_rescued）；非 loop 截断保留 gundam 人工复核；gundam 已有结果时 base 失败不覆盖；py_compile + 离线三分支模拟验证通过（loop→rescued / 双 length / 真密排保留 / 正常直收）
+- 文档：env-compat-eval.md §9 归因闭环条 + v3 救援条 + 吞吐处置句更新；deployment.md §4 v3 行为注记
+- 教训记录：MultiEdit 编辑残留一行重复赋值（status），复审后 Edit 清除——脚本类编辑后必须重读验证
+- 推送 origin（dongf9527/Unlimited-OCR.git）成功
+
+Stage Summary:
+- 5.png 案件完整闭环：现象→定性（loop）→归因（gundam 窄条切片）→自动化处置（v3 救援）→判据入库
+- 剩余悬挂：EOS 页尾真值核查、更大图片目录 100 页放大（用 v3）

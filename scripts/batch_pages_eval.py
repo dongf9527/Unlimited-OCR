@@ -4,7 +4,10 @@
 逐页单请求（等价 BATCH_PAGES=1，勿用 infer_multi 整本模式——16G 会 OOM），
 支持 progress.jsonl 断点续跑、单页失败 gundam→base 各重试一次、summary.json 汇总；
 页内 [TPS] 心跳（每 100 token 一行，约 9s）+ max_new_tokens 硬上限防 runaway 页拖死整批。
-测速口径见 env-compat-eval.md §7/§8（infer_s 不含图片预处理；wall_s 为端到端）。
+v3：gundam finish=length 且 top1 字符占比 >50%（loop 判据，实测定性见 env-compat-eval.md §9）
+    时自动降级 base 重跑救援（产物同路径覆盖，rec 标记 loop/rescued）；
+    非 loop 截断（真密排页）保留 gundam 结果进人工复核，不浪费重跑。
+测速口径见 env-compat-eval.md §7/§8/§9（infer_s 不含图片预处理；wall_s 为端到端）。
 
 用法:
     python batch_pages_eval.py [N_PAGES] [IMG_DIR]
@@ -13,6 +16,7 @@
 输出:
     OUT_DIR/pages/<页名>/result.md（每页版面产物）+ progress.jsonl + summary.json
 """
+import collections
 import contextlib
 import glob
 import io
@@ -81,18 +85,31 @@ for i, img in enumerate(todo, 1):
                                   output_path=os.path.join(OUT_DIR, "pages", stem),
                                   save_results=True, return_dict=True, eval_mode=True,
                                   max_new_tokens=MAX_NEW_TOKENS, tps_interval=TPS_EVERY, **kw)
+            if attempt == 1 and rec.get("loop") and res["finish_reason"] == "stop":
+                rec["rescued"] = True                             # v3: loop 页被 base 救回
             rec.update(ok=True, mode=("gundam" if attempt == 0 else "base"),
                        tokens=len(res["token_ids"]), finish=res["finish_reason"],
                        infer_s=round(res["time"], 2),
                        prefill_s=round(res["prefill_time"] or 0, 2),
                        wall_s=round(time.time() - t0, 2))
-            break
+            if res["finish_reason"] == "stop" or attempt == 1:
+                break                                             # stop 即收；base 轮无论 finish 都收尾
+            txt = re.sub(r"\s+", "", res["text"] or "")           # v3: gundam length -> loop 判定
+            if txt and collections.Counter(txt).most_common(1)[0][1] / len(txt) > 0.5:
+                rec["loop"] = True                                # 疑 loop（判据见 §9）-> base 救援，产物被 base 版覆盖
+                continue
+            break                                                 # 非 loop 截断（真密排）-> 保留，人工复核
         except Exception as e:                                    # OOM 等异常：降级重试，不让整批中断
             rec["error"] = f"{type(e).__name__}: {e}"[:200]
             torch.cuda.empty_cache()
+            if rec.get("ok"):
+                break                                             # v3: 已有 gundam 结果，base 重试失败不覆盖
     with open(PROGRESS, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    status = f"ok({rec['mode']})" if rec["ok"] else f"FAIL {rec.get('error', '')}"
+    if rec["ok"]:
+        status = "ok(" + rec["mode"] + (",rescued" if rec.get("rescued") else "") + ")"
+    else:
+        status = f"FAIL {rec.get('error', '')}"
     print(f"[{i}/{len(todo)}] {name}  {status}  wall={rec.get('wall_s', '-')}s  "
           f"tokens={rec.get('tokens', '-')}  finish={rec.get('finish', '-')}", flush=True)
     if i % 10 == 0:
@@ -110,6 +127,8 @@ stats = {
     "finish_stop": sum(1 for r in ok if r["finish"] == "stop"),
     "finish_length": sum(1 for r in ok if r["finish"] == "length"),
     "base_fallback_used": sum(1 for r in ok if r["mode"] == "base"),
+    "loop_flagged": sum(1 for r in ok if r.get("loop")),          # v3: gundam 判实 loop 的页数
+    "length_rescued": sum(1 for r in ok if r.get("rescued")),     # v3: 其中被 base 救回的页数
     "pages_per_hour_this_run": round(len(todo) / max(time.time() - t_all, 1e-6) * 3600, 1),
     "failed": [os.path.basename(r["image"]) for r in rows if not r["ok"]],
 }
