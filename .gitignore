@@ -3,3 +3,6 @@ node_modules/
 .env
 research/
 tool-results/
+
+# git 凭证安全存储（绝不提交）
+.credentials/
