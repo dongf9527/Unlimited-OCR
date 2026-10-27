@@ -56,11 +56,17 @@ conda env export --no-builds > uocr-lock.yml
 # 异机复现：conda env create -f uocr-lock.yml
 ```
 
-可选加速（按 torch 2.11.0+cu128 匹配轮子，未装则自动回退 SDPA，功能等价）：
+flash-attn：**不适用，无需安装**（基于 `hf-model-code/` 静态检查，2026-10-28 实测确认）。本模型 `use_mla=false`，解码注意力固定走 `mha_eager`（SR-SWA）；`ATTENTION_CLASSES` 中 `mha_flash_attention_2` 已被上游注释，flash-attn 在主路径不可达，**装与不装对吞吐与结果均无影响**；视觉编码器 `use_flash_attn=False` 源码硬编码，即便启用其 True 分支也只调用 torch 内置 SDPA，不依赖 flash_attn 库。安装失败属预期现象，直接跳过该步：
 
 ```bash
 pip install flash-attn --no-build-isolation
+# 实测（2026-10-28）：metadata 阶段报 ModuleNotFoundError: No module named 'psutil'，无需处理，跳过即可
+# 若确需安装（如未来上游启用 MLA/FA2 路径）：先 pip install psutil packaging ninja；
+#   并备妥 CUDA 12.8 的 nvcc（CUDA_HOME 指向含 bin/nvcc 的完整 toolkit，§2 pip 装的 cuda-toolkit 运行时库不含 nvcc）；
+#   再 export MAX_JOBS=4 限内存（每任务约 2GB），源码编译全程约 1~3 小时
 ```
+
+> **禁止**向 `from_pretrained` 传 `attn_implementation="flash_attention_2"`：`ATTENTION_CLASSES` 无 `mha_flash_attention_2` 键，模型将在加载期以 KeyError 崩溃。
 
 ## 3. 冒烟测试
 
@@ -163,7 +169,7 @@ python utils/process_unlimitedOCR2.py --help   # 后处理：页切分/标题树
 | --- | --- |
 | 整本请求 OOM | 降批页数 `BATCH_PAGES` 10→5→1；仍 OOM 降 DPI 300→200 |
 | 16G 卡 | 固定单页顺序（`BATCH_PAGES=1`），bf16 保持不变，不要降精度 |
-| 吞吐低于目标 | 安装 flash-attn（§2 可选项）；确认输入为 300 dpi 单页图而非整页大图重复缩放 |
+| 吞吐低于目标 | 确认输入为 300 dpi 单页图而非整页大图重复缩放；排查 PDF 渲染（fitz）与推理是否串行阻塞；flash-attn 与吞吐无关（§2，主路径不可达） |
 | 输出被截断 | 提高模型侧页 token 上限后重跑该页；频繁截断的超密页拆分后再解析 |
 | 跨页表格合并变差 | 检查分批边界是否切在同一段表格中间；批大小 ≥ 10 页/批可覆盖绝大多数跨页表格 |
 | 加载即报 transformers 内部 API 缺失 | 环境混入 transformers 5.x，回退 `transformers==4.52.1 tokenizers==0.21.4` 并重建环境（勿在共享环境修补） |

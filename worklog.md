@@ -252,3 +252,22 @@ Work Log:
 
 Stage Summary:
 - 远程同步于本批提交；权重路径定稿 + data/ 放行均已落地，防护重心移至 models/ 与 *.safetensors 双规则
+
+---
+Task ID: 13
+Agent: main (Z.ai)
+Task: 对齐沙箱与 GitHub（沙箱回滚恢复）；分析 CNBEJFSOP03 部署日志（v1.1 三步安装 + flash-attn 失败）
+
+Work Log:
+- 发现沙箱回滚至 b242ecd（Task 8 时期），远程领先 12 commit（Task 9~12 全部成果在 origin/main）；48 个文件的 M 状态经 git diff --stat 确认为纯 filemode 伪差异（0 insertions/0 deletions，100644→100755，沙箱恢复副作用）
+- 恢复：git config core.filemode false 消除伪差异 → git merge --ff-only origin/main 快进至 b60c908；assets/HarryPotter.gif LFS 指针 checkout 复位；工作区 clean，本地 = 远程
+- 逐项核对部署日志与 v1.1 矩阵：三步安装全部精确命中（torch 2.11.0+cu128/torchvision 0.26.0 配对、transformers 4.52.1+tokenizers 0.21.4+huggingface-hub 0.36.0 成组、pillow 12.3.0→11.0.0 压回、pymupdf/opencv/python-docx/reportlab 5.1.0 均符合），锁定文件已生成
+- flash-attn 失败根因：--no-build-isolation 跳过构建依赖，flash-attn setup.py 自定义 build_ext 缺 psutil（metadata 阶段 ModuleNotFoundError）
+- 关键判定（静态检查 hf-model-code/）：config.json use_mla=false → 解码固定 mha_eager（SR-SWA，ATTENTION_CLASSES 中 mha_flash_attention_2 被上游注释）；视觉侧 use_flash_attn=False 源码硬编码且 True 分支亦为 torch SDPA（deepencoder.py L349）→ flash-attn 主路径不可达，装与不装无影响，安装失败属预期、无需修复；显式传 attn_implementation="flash_attention_2" 会 KeyError 崩溃
+- 修正三处产物：deployment.md §2 可选加速块改为"不适用，无需安装"（含故障处理与禁止传参警告）、§6 调优表"吞吐低于目标"行删除安装 flash-attn 建议；check_env.py check_flash_attn 判定文案同步（已装=无实际加速/未装=正常状态）；env-compat-eval.md 追加 §5 部署实测回归
+- py_compile + --json 运行验证通过（flash-attn INFO 文案按预期输出）
+
+Stage Summary:
+- 沙箱与 GitHub 重新对齐于 b60c908（origin/main），core.filemode=false 防复发
+- 部署环境判定：v1.1 定稿矩阵全绿，仅 flash-attn 失败且无需处理；文档与自检脚本已消除"未装 flash-attn 影响吞吐"的误导表述
+- 下一步：用户侧跑 check_env.py 全绿后进单页冒烟（deployment.md §3）
