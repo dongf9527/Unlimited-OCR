@@ -27,6 +27,8 @@ hf download baidu/Unlimited-OCR-2 --local-dir /data/models/Unlimited-OCR-2
 # 或 huggingface-cli download（hub 0.36.0 均可用）
 ```
 
+> **路径约定**：本文档以 `/data/models/Unlimited-OCR-2` 为示例路径，可整体替换为实际权重目录（如 `~/sourcecode/Unlimited-OCR/data/models/Unlimited-OCR`），但三处必须保持一致：§1 自检的 `--model-dir`、§3 冒烟的 `name`、§4 批量客户端的 `MODEL`。权重目录放进仓库克隆内不受影响（check_env 支持 `~/` 与 `~user/` 展开，加引号亦可），但必须位于 `.gitignore` 排除的 `data/` 之下，严防 6.6GB 分片被提交（仓库未对 safetensors 配 LFS）。
+
 ## 2. 环境部署（conda）
 
 ```bash

@@ -499,6 +499,8 @@ def main():
         _COLOR = False
 
     rep = Report()
+    if args.model_dir:                      # 支持 ~/ 与 $VAR 写法（含引号包裹时 bash 不展开的场景）
+        args.model_dir = os.path.expandvars(os.path.expanduser(args.model_dir))
     if args.route == "B":
         PIN["torch"] = "2.13.0"            # 路线 B 按归档 v1.0 基线校验（SGLang wheel 绑定）
     if not args.json:                       # JSON 模式 stdout 必须是纯 JSON（CI 解析）

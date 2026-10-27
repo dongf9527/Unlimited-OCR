@@ -225,3 +225,17 @@ Work Log:
 Stage Summary:
 - 远程同步于本批提交；文档体系现为：PRD v1.1 + deployment v1.1 + eval（定稿依据）+ archive（v1.0 追溯）
 - 定稿版本速记：Python 3.10(conda) / torch 2.11.0 / transformers 4.52.1 / tokenizers 0.21.4 / pillow 11.0.0 / pymupdf 1.27.2.2 / opencv 5.0.0.93 / python-docx 1.2.0
+
+---
+Task ID: 13
+Agent: main (Z.ai)
+Task: 确认用户自定义权重路径可行性并做三处配套防御
+
+Work Log:
+- 用户拟将 --model-dir 改为 ~/sourcecode/Unlimited-OCR/data/models/Unlimited-OCR：确认路径合法（目录名随意），但发现三处连带问题并修复
+- .gitignore 无 data//safetensors 排除 → 补 data/ 与 *.safetensors 两条（check-ignore 验证），防止 6.6GB 分片误入库（未配 LFS，push 必被 100MB 限制拒绝）
+- check_env.py --model-dir 增加 expanduser+expandvars：带引号的 ~/ 路径此前会被当字面量报"目录不存在"，现两种写法均实测通过（~/my-project/hf-model-code 引号/不带引号）
+- deployment.md §1 增补路径约定块：三处路径（自检 --model-dir / 冒烟 name / 批量 MODEL）必须一致 + 权重须在 data/ 下的警示
+
+Stage Summary:
+- 远程同步于本批提交；用户可放心使用其路径，唯一硬要求是权重放 data/ 下且全文档三处路径一致
