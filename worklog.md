@@ -336,3 +336,20 @@ Work Log:
 Stage Summary:
 - RTX 5080 冷启动基线已上 GitHub（0d48c10）：~24s/页 ≈ 148 页/时，符合 16G 卡定位
 - 待补：热稳态双跑数据、100 页批量吞吐（BATCH_PAGES=1）
+
+---
+Task ID: 17
+Agent: main (Z.ai)
+Task: 用户回传热稳态双跑数据——解读并补全 5080 基线
+
+Work Log:
+- 用户实测回传：run1 prefill 2.92s / 10.8 t/s；run2（稳态）prefill 0.35s / decode 11.5 t/s / total 18.71s ≈ 190 页/时；两轮 finish_reason=stop、tokens=211 与冷启动逐字符一致
+- 三项假设证实：① 冷启动 6.00s prefill 为 Triton JIT 主导（-94%）；② TextStreamer 打印开销可忽略（eval_mode 关闭后 TPS 持平），11.5 即真实 decode；③ 211 token 为自然 EOS 非截断
+- decode 效率注记：11.5 t/s ≈ 87ms/token，主要受逐 token 框架开销（Python 循环 + kernel 启动 + DASH 路由/entmax）影响，HF eager 单卡顺序属正常水平；量级提升靠批量/服务化（A 级卡）
+- 文档补全：env-compat-eval.md §8 增热稳态复测与 decode 效率注记、定位结论更新为 148~190 页/时；deployment.md §6 基线注记更新
+- 提交 8c706ba 按 SOP --no-verify 推送成功，本地 = origin/main
+- 待补仅剩：100 页批量吞吐（BATCH_PAGES=1，预计端到端 ~19-20s/页 量级）；EOS 早停与否待用户对照真值
+
+Stage Summary:
+- 5080 基线定稿（8c706ba）：冷 24.4s/页 / 稳态 18.7s/页 ≈ 190 页/时，decode 11.5 t/s
+- 下一步：100 页批量实测（deployment.md §4）；对照真值核查 EOS 早停
