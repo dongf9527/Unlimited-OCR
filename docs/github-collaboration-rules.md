@@ -83,7 +83,7 @@ rebase 会改写提交历史，执行前必须先评估更安全的替代方案�
 | 推送前清洗 | `.env`（含 DATABASE_URL）已从全部历史移除并加入 `.gitignore`；`research/`、`tool-results/` 已移出索引并忽略 |
 | `docs/` 目录 | 全部文档沉淀处：报告 md/docx、charts/ 图表、README 索引及本规则文件（对应规则 4） |
 | 目录迁移 | 2026-10-27 将 `download/` 下全部文档与图表迁移至 `docs/`，此后报告类交付物直接写入 `docs/` |
-| 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，待使用者重新提供 token 后写入） |
+| 凭证存储 | `/home/z/my-project/.credentials/github-token`（gitignored，权限 600，2026-10-27 已写入并用于推送） |
 
 ## 四、凭证安全约定（v1.1 更新：持久化存储）
 

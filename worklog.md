@@ -109,3 +109,17 @@ Work Log:
 Stage Summary:
 - 本地新增 3 个未推送 commit：eaed9f4 (chore gitignore) / c5819d8 (docs 规则 v1.1) / 3db3219 (docs 迁移)
 - 待办：使用者重新提供 token → 写入 .credentials/github-token → 立即推送
+
+---
+Task ID: 6
+Agent: main (Z.ai)
+Task: token 持久化保存 + 推送目录迁移等 5 个待推 commit
+
+Work Log:
+- 使用者重发 fine-grained PAT，经 Write 工具直接写入 .credentials/github-token（不经 shell 命令行参数），权限 600、目录 700，gitignore 复验生效
+- 以内联 credential helper 从文件读取注入完成推送：b0eb161..e124a15 main -> main，共 5 个 commit（gitignore、规则 v1.1、文档迁移、worklog、download 清理），token 未出现在进程参数/remote URL/.git/config
+- 更新规则文档接入状态表（凭证存储：已写入）并追加本日志，随推送收尾
+
+Stage Summary:
+- 远程与本地同步于 e124a15；token 有效期至约 2026-11-26，到期前提醒轮换
+- 后续所有推送/拉取自动复用 .credentials/github-token，无需使用者再提供
