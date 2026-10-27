@@ -287,3 +287,18 @@ Stage Summary:
 - 本地 = origin/main = 42b5b1d，flash-attn 结论修正已上 GitHub
 - 环境三件套（token / git-lfs / filter）全部重建；token 有效期至约 2026-11-26
 - 沙箱回滚恢复 SOP 验证通过：filemode=false → ff-only → （纯文本 commit 时）--no-verify 推送
+
+---
+Task ID: 14
+Agent: main (Z.ai)
+Task: 单页冒烟实测回归——infer() 返回值契约修正（文档 bug）
+
+Work Log:
+- 用户目标机（CNBEJFSOP03 / RTX 5080 / sm_120）单页冒烟：模型加载与推理全部成功（DASH block-sparse Triton JIT 激活、S=1519、结构化输出正常、产物落盘 out/single），仅末行 `text, n = model.infer(...)` 报 ValueError: too many values to unpack
+- 源码核对（modeling_unlimitedocr.py L1039-1123）：infer() 默认返回纯字符串，return_dict=True 返回 dict（text/token_ids/prompt_token_ids/prompt），无 2 元组形态；infer_multi() 才返回 (text, len(token_ids))，且为 infer(crop_mode=False, return_dict=True) 兼容包装；infer() 本身即单/多页统一入口（image_file 可传 list，crop_mode=None 自动 gundam/base）
+- 修正 deployment.md §3 单页示例（return_dict=True 取 text+tokens）并补"返回值契约"注记（infer vs infer_multi）；env-compat-eval.md 新增 §6 冒烟回归记录
+- commit 两个：fix(deployment) 返回值契约修正 + docs(prd) 冒烟回归记录，推送 GitHub
+
+Stage Summary:
+- v1.1 定稿矩阵在 Blackwell 消费级卡完成端到端验证（自检全绿 + 冒烟通过）
+- 待补实测：单页耗时/TPS（infer(..., tps_interval=1)）与 100 页批量吞吐（16G 卡 BATCH_PAGES=1 顺序）
