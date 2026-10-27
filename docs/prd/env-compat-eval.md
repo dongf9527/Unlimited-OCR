@@ -72,3 +72,12 @@
 实测 `infer(..., tps_interval=1)` 的定性结论：`tps_interval` 是真实参数（`infer()` 签名内默认 `0`），语义为"每 N 个 token 打印一行"，`1` 即逐 token 刷屏——该建议作废。打印点在 `_uocr_generate()`（L1185-1187）：`if tps_interval and len(gen) % tps_interval == 0` 时打 `[TPS] tokens=N avg=X t/s`（行首自带 `\n`，故每行间还有一个空行）；`0` 为 falsy，**默认即完全静默**。类 `TPSTextStreamer`（L440，带 `recent=` 字段）在 `infer()` 路径未被使用（L1155 构造的是原生 `TextStreamer`，仅负责流式吐字）。
 
 测速正确姿势（免刷屏、且比 `[TPS]` 行更完整）：`_uocr_generate` 返回 dict 自带计时（L1204-1205），`return_dict=True` 时原样透传——`res['time']`（prefill+decode 总耗时）与 `res['prefill_time']`，decode TPS = `len(res['token_ids']) / (res['time'] - res['prefill_time'])`。需要进度采样时用 `tps_interval=50` 量级。另注：`tokens=1` 首行 avg 为失真值（`t_first` 与首个 token 在同一迭代内赋值，L1177-1178，dt≈0.2ms），从 `tokens=2` 起才有参考意义。若连流式正文吐出都不需要，传 `eval_mode=True`（`stream=False`）全程静默，结束后读 `res['text']`。`deployment.md` §3 已同步补测速注记。待补实测维持：100 页批量吞吐（16G 卡 `BATCH_PAGES=1` 顺序）。
+
+## 8. 单页耗时实测（2026-10-28，RTX 5080，冷启动）
+
+- 条件：`book01/2.png` 单页 gundam，S=1519（image tokens 1513），`tps_interval` 默认静默，按 §7 方法读返回 dict 计时字段（修正后的 §3 示例命令原样复跑）。
+- 结果：**tokens=211，prefill=6.00s，total=24.37s，decode_TPS=11.5 t/s**（decode ≈18.4s），与首轮逐 token 流式观测（avg 爬升至 ~11.3 t/s）交叉印证一致。
+- 解读：① 冷启动 prefill 含 DASH block-sparse Triton kernel JIT 编译（解码前几步 TPS 仅 ~5.5 后爬升到稳态），热跑 prefill 应显著下降，稳态数据待补；② `res['time']` 起于 `_uocr_generate`，不含图片预处理/gundam 切片与模型加载；③ 流式 `TextStreamer` 逐 token decode/print 开销含在 decode TPS 内，基准测试建议 `eval_mode=True` 去除。
+- 定位结论：5080 单请求 ~24s/页（冷）≈ 148 页/时，符合 16G 卡"功能验证/小批量"定位（deployment.md §1）；PRD ≥600 页/时/卡验收按既定定位在 A 级卡验证。
+- 质量观察：211 token 处以自然 EOS 结束（与前轮逐 token 流完全一致，确定性输出），正文止于"…者可"呈半句截断，页码块误识别为片假名"リョ"——是否早停需对照该页真值判断，热跑命令已带 `finish_reason` 输出。
+- 待补：同进程双跑热稳态（prefill 降幅 + 纯 decode TPS）、100 页批量吞吐（`BATCH_PAGES=1`）。
