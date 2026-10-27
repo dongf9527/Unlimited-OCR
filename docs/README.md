@@ -8,6 +8,7 @@
 | --- | --- |
 | `github-collaboration-rules.md` | GitHub 协作规则 v1.1：7 条规则总览与细则、沙箱准确路径、凭证安全约定、接入状态 |
 | `../hf-model-code/` | 上游 HuggingFace 建模源码与配置（10 个 .py + 5 个 JSON，不含权重，MIT）来源与用法见其内 README |
+| `sr-swa-source-walkthrough.md` | SR-SWA 源码导读：稀疏参考滑动窗口注意力的类分工、四大机制与二开切入点 |
 | `upstream-source-code-analysis.md` | 上游源代码分布调研：MIT 完整开源、源码托管于 HuggingFace/ModelScope 的实证与清单 |
 | `Unlimited-OCR-深度拆解报告.md` | 百度 Unlimited-OCR 开源仓库深度拆解报告（约 9060 字，含架构、部署、二开方向、竞品对比、RTX 5080 部署实践） |
 | `百度Unlimited-OCR深度拆解报告.docx` | 上报告的 Word 版本（26 页，TOC/页脚/postcheck 9/9 通过） |
